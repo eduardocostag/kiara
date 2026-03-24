@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const fetch = require('node-fetch');
 const { exec } = require('child_process');
-const { EdgeTTS } = require('edge-tts-node'); // Motor simplificado
+const googleTTS = require('google-tts-api'); // Motor estável e gratuito
 
 const publicPath = path.join(__dirname, 'public');
 if (!fs.existsSync(publicPath)) fs.mkdirSync(publicPath);
@@ -21,12 +21,8 @@ const KEYS = {
     MISTRAL: "mhIHAYZopQKhjgMhfQhHkBTkW2BtnBQ6"
 };
 
-const tts = new EdgeTTS();
-
 fastify.post('/api/chat', async (request, reply) => {
     const { pergunta } = request.body;
-    
-    // Contexto de tempo para a Kiara
     const agora = new Date();
     const dataFormatada = agora.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     const horaFormatada = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -65,20 +61,20 @@ fastify.post('/api/chat', async (request, reply) => {
 
     try {
         const kiaraData = await getAIResponse();
-        console.log("🎙️ [Edge TTS] Gerando voz neural gratuita...");
+        console.log("🎙️ [Google TTS] Gerando voz gratuita...");
         
-        const fileName = `voz_${Date.now()}.mp3`; // Nome único para evitar erro de cache
-        const filePath = path.join(publicPath, fileName);
-        
-        // pt-BR-FranciscaNeural é a voz feminina padrão do Edge
-        await tts.ttsPromise(kiaraData.texto, filePath, "pt-BR-FranciscaNeural");
+        // Gera a URL do áudio diretamente (sem precisar de arquivos locais)
+        const url = googleTTS.getAudioUrl(kiaraData.texto, {
+            lang: 'pt-BR',
+            slow: false,
+            host: 'https://translate.google.com',
+        });
 
-        const audioBuffer = fs.readFileSync(filePath);
-        
-        // Limpa o arquivo logo após ler para não encher o HD
-        setTimeout(() => { if(fs.existsSync(filePath)) fs.unlinkSync(filePath); }, 5000);
+        // Baixa o áudio para enviar como Base64 (mantendo compatibilidade com seu front)
+        const audioRes = await fetch(url);
+        const buffer = await audioRes.arrayBuffer();
 
-        return { ...kiaraData, audio: audioBuffer.toString('base64') };
+        return { ...kiaraData, audio: Buffer.from(buffer).toString('base64') };
     } catch (err) { 
         console.error("🔥 Erro:", err);
         return reply.status(500).send({ error: "Erro na Kiara" }); 
@@ -86,6 +82,6 @@ fastify.post('/api/chat', async (request, reply) => {
 });
 
 fastify.listen({ port: 3000, host: '0.0.0.0' }, () => {
-    console.log('🚀 Kiara 18.6 Online | Design Travado | Voz Ativa');
+    console.log('🚀 Kiara 19.0 Online | Design Travado | Google TTS Ativo');
     exec('start http://localhost:3000');
 });
