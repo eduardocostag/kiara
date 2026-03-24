@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Kiara Core 13.0 | Vision & Action</title>
+    <style>
+        body { margin: 0; background: #010204; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        #chat-ui { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; gap: 10px; }
+        input { background: rgba(255,255,255,0.05); border: 1px solid rgba(0,242,255,0.2); padding: 12px 20px; color: white; border-radius: 30px; width: 300px; outline: none; backdrop-filter: blur(10px); }
+        button { background: rgba(0,242,255,0.1); border: 1px solid #00f2ff; color: #00f2ff; border-radius: 50%; width: 45px; height: 45px; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #00f2ff; color: black; }
+        #status-bar { position: fixed; top: 20px; left: 20px; color: #00f2ff; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+
+<div id="status-bar">Sincronia Estável // Mood: <span id="current-mood">Cyan</span></div>
+
+<div id="chat-ui">
+    <button id="btn-vision" title="Compartilhar Tela">👁️</button>
+    <input type="text" id="chat-input" placeholder="Comando ou pergunta...">
+</div>
+
+<script type="module">
+    import * as THREE from 'https://cdn.skypack.dev/three@0.136.0/build/three.module.js';
+
+    let scene, camera, renderer, sphereGroup, coreMesh;
+    let currentColors = { main: 0x00f2ff, accent: 0xffffff };
+
+    function init3D() {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 8;
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        sphereGroup = new THREE.Group();
+        scene.add(sphereGroup);
+
+        const material = new THREE.MeshBasicMaterial({ color: 0x00f2ff, wireframe: true, transparent: true, opacity: 0.3 });
+        
+        [2, 3.5, 5].forEach(r => {
+            const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 2), material.clone());
+            sphereGroup.add(m);
+        });
+
+        coreMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 5), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+        scene.add(coreMesh);
+
+        animate();
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        sphereGroup.rotation.y += 0.005;
+        sphereGroup.children.forEach((s, i) => s.rotation.x += 0.002 * (i+1));
+        renderer.render(scene, camera);
+    }
+
+    // --- SISTEMA DE VISÃO ---
+    async function captureScreen() {
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            await video.play();
+
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            stream.getTracks().forEach(t => t.stop());
+            return canvas.toDataURL('image/png');
+        } catch (e) { return null; }
+    }
+
+    // --- COMUNICAÇÃO ---
+    async function falarComKiara(pergunta) {
+        let screenshot = null;
+        if (pergunta.toLowerCase().includes("veja") || pergunta.toLowerCase().includes("tela")) {
+            screenshot = await captureScreen();
+        }
+
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ pergunta, screenshot })
+        });
+
+        const data = await res.json();
+        
+        // Mudar Humor Visual
+        updateMood(data.mood);
+        
+        // Tocar Voz
+        const audio = new Audio("data:audio/mp3;base64," + data.audio);
+        audio.play();
+    }
+
+    function updateMood(mood) {
+        document.getElementById('current-mood').innerText = mood;
+        let color = 0x00f2ff;
+        if (mood === 'amber') color = 0xffa500;
+        if (mood === 'crimson') color = 0xff0033;
+
+        sphereGroup.children.forEach(s => s.material.color.setHex(color));
+        coreMesh.material.color.setHex(color);
+    }
+
+    document.getElementById('chat-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            falarComKiara(e.target.value);
+            e.target.value = '';
+        }
+    });
+
+    window.addEventListener('click', () => { if(!scene) init3D(); }, {once: true});
+</script>
+</body>
+</html>
