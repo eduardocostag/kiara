@@ -75,6 +75,19 @@
         }
         requestAnimationFrame(render);
 
+        const recognition = new webkitSpeechRecognition();
+        recognition.lang = 'pt-BR';
+        recognition.continuous = false;
+
+        recognition.onresult = (event) => {
+            const texto = event.results[0][0].transcript;
+            // envia para /api/chat normalmente
+            enviarMensagem(texto);
+        };
+
+document.getElementById('btn-voz').onclick = () => recognition.start();
+
+
         async function falar() {
             const i = document.getElementById('pergunta'), o = document.getElementById('output');
             if(!i.value) return;
