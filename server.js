@@ -28,9 +28,17 @@ async function salvarMemoria(pergunta, resposta) {
     };
 
     await redis.lpush('kiara_memory', JSON.stringify(item));
-
-    // manter só os últimos 100 registros
     await redis.ltrim('kiara_memory', 0, 99);
+}
+
+function safeParse(item) {
+    if (!item) return null;
+
+    try {
+        return typeof item === "string" ? JSON.parse(item) : item;
+    } catch (e) {
+        return null;
+    }
 }
 
 async function getRelevantMemory() {
@@ -38,9 +46,12 @@ async function getRelevantMemory() {
 
     return data
         .map(item => {
-            const m = JSON.parse(item);
+            const m = safeParse(item);
+            if (!m) return null;
+
             return `Usuário: ${m.pergunta}\nKIARA: ${m.resposta}`;
         })
+        .filter(Boolean)
         .join("\n\n");
 }
 
@@ -100,24 +111,25 @@ async function gerarAudio(texto) {
 async function getAI(pergunta) {
 
     const agora = new Date();
-
     const memoria = await getRelevantMemory();
 
     const system = `
 Você é KIARA, assistente pessoal avançada.
 
-FORMATO JSON:
+IMPORTANTE:
+- Responda SOMENTE em JSON válido
+- Não use markdown
+- Não use \`\`\`
+- Nunca use emojis
+- Nunca use *
+- Sempre respeite o formato
+
+FORMATO:
 
 {
  "texto": "resposta natural",
  "acoes": []
 }
-
-REGRAS:
-- Nunca usar emojis
-- Nunca usar *
-- Sempre responder em JSON válido
-- Pode retornar múltiplas ações
 
 DATA: ${agora.toLocaleDateString('pt-BR')}
 HORA: ${agora.toLocaleTimeString('pt-BR')}
@@ -144,7 +156,14 @@ ${memoria}
     const raw = await res.text();
     console.log("📡 IA RAW:", raw);
 
-    const json = JSON.parse(raw);
+    let json;
+
+    try {
+        json = JSON.parse(raw);
+    } catch (e) {
+        console.error("Erro ao parsear resposta da IA:", raw);
+        throw new Error("IA retornou resposta inválida");
+    }
 
     let content = json.choices?.[0]?.message?.content;
 
@@ -152,7 +171,16 @@ ${memoria}
 
     content = content.replace(/```json|```/g, '').trim();
 
-    return JSON.parse(content);
+    let parsed;
+
+    try {
+        parsed = JSON.parse(content);
+    } catch (e) {
+        console.error("Erro ao parsear content da IA:", content);
+        throw new Error("JSON inválido vindo da IA");
+    }
+
+    return parsed;
 }
 
 // ─────────────────────────────
