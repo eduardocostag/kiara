@@ -26,19 +26,20 @@ async function salvarMemoria(pergunta, resposta) {
     await redis.lpush(
         'kiara_memory',
         JSON.stringify({
-            pergunta,
-            resposta,
+            pergunta: String(pergunta),
+            resposta: String(resposta),
             time: Date.now()
         })
     );
 }
-
 // parse seguro
 function safeParse(item) {
-    if (!item) return null;
+    if (!item || item === "[object Object]") return null;
 
     try {
-        return typeof item === "string" ? JSON.parse(item) : item;
+        if (typeof item === "object") return item;
+
+        return JSON.parse(item);
     } catch {
         return null;
     }
@@ -53,11 +54,14 @@ async function getRelevantMemory(pergunta) {
     return data
         .map(item => {
             const m = safeParse(item);
-            if (!m) return null;
+
+            if (!m || !m.pergunta || !m.resposta) return null;
 
             const texto = `${m.pergunta} ${m.resposta}`.toLowerCase();
 
-            const relevancia = palavras.filter(p => texto.includes(p)).length;
+            const relevancia = palavras.filter(p =>
+                texto.includes(p)
+            ).length;
 
             return { ...m, relevancia };
         })
