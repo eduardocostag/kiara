@@ -18,61 +18,53 @@ const redis = new Redis({
 });
 
 // ─────────────────────────────
-// 🧠 MEMÓRIA (REDIS)
+// 🧠 MEMÓRIA
 // ─────────────────────────────
+
+// salvar memória
 async function salvarMemoria(pergunta, resposta) {
-    const item = {
-        pergunta,
-        resposta,
-        time: Date.now()
-    };
+    await redis.lpush(
+        'kiara_memory',
+        JSON.stringify({
+            pergunta,
+            resposta,
+            time: Date.now()
+        })
+    );
+}
 
-await redis.lpush(
-  'kiara_memory',
-  JSON.stringify({
-    pergunta,
-    resposta,
-    time: Date.now()
-  })
-);
-
+// parse seguro
 function safeParse(item) {
     if (!item) return null;
 
     try {
         return typeof item === "string" ? JSON.parse(item) : item;
-    } catch (e) {
+    } catch {
         return null;
     }
 }
 
-async function getRelevantMemory() {
-    const data = await redis.lrange('kiara_memory', 0, 19);
+// buscar memória relevante (INTELIGENTE)
+async function getRelevantMemory(pergunta) {
+    const data = await redis.lrange('kiara_memory', 0, 100);
+
+    const palavras = pergunta.toLowerCase().split(" ");
 
     return data
         .map(item => {
-            try {
-                // se já for objeto válido
-                if (typeof item === "object" && item !== null) {
-                    return `Usuário: ${item.pergunta}\nKIARA: ${item.resposta}`;
-                }
+            const m = safeParse(item);
+            if (!m) return null;
 
-                // se for string
-                if (typeof item === "string") {
-                    // evitar "[object Object]"
-                    if (item === "[object Object]") return null;
+            const texto = `${m.pergunta} ${m.resposta}`.toLowerCase();
 
-                    const m = JSON.parse(item);
-                    return `Usuário: ${m.pergunta}\nKIARA: ${m.resposta}`;
-                }
+            const relevancia = palavras.filter(p => texto.includes(p)).length;
 
-                return null;
-
-            } catch (e) {
-                return null;
-            }
+            return { ...m, relevancia };
         })
         .filter(Boolean)
+        .sort((a, b) => b.relevancia - a.relevancia)
+        .slice(0, 5)
+        .map(m => `Usuário: ${m.pergunta}\nKIARA: ${m.resposta}`)
         .join("\n\n");
 }
 
@@ -127,23 +119,20 @@ async function gerarAudio(texto) {
 }
 
 // ─────────────────────────────
-// 🧠 IA
+// 🧠 IA (MISTRAL)
 // ─────────────────────────────
 async function getAI(pergunta) {
 
-    const agora = new Date();
-    const memoria = await getRelevantMemory();
+    const memoria = await getRelevantMemory(pergunta);
 
     const system = `
-Você é KIARA, assistente pessoal avançada.
+Você é KIARA, assistente inteligente.
 
 IMPORTANTE:
-- Responda SOMENTE em JSON válido
+- Responda APENAS em JSON válido
 - Não use markdown
-- Não use \`\`\`
-- Nunca use emojis
-- Nunca use *
-- Sempre respeite o formato
+- Não use emojis
+- Não use *
 
 FORMATO:
 
@@ -151,9 +140,6 @@ FORMATO:
  "texto": "resposta natural",
  "acoes": []
 }
-
-DATA: ${agora.toLocaleDateString('pt-BR')}
-HORA: ${agora.toLocaleTimeString('pt-BR')}
 
 MEMÓRIA:
 ${memoria}
@@ -170,7 +156,8 @@ ${memoria}
             messages: [
                 { role: "system", content: system },
                 { role: "user", content: pergunta }
-            ]
+            ],
+            temperature: 0.7
         })
     });
 
@@ -181,9 +168,8 @@ ${memoria}
 
     try {
         json = JSON.parse(raw);
-    } catch (e) {
-        console.error("Erro ao parsear resposta da IA:", raw);
-        throw new Error("IA retornou resposta inválida");
+    } catch {
+        throw new Error("Erro ao parsear resposta da IA");
     }
 
     let content = json.choices?.[0]?.message?.content;
@@ -196,9 +182,9 @@ ${memoria}
 
     try {
         parsed = JSON.parse(content);
-    } catch (e) {
-        console.error("Erro ao parsear content da IA:", content);
-        throw new Error("JSON inválido vindo da IA");
+    } catch {
+        console.error("Erro JSON:", content);
+        throw new Error("JSON inválido da IA");
     }
 
     return parsed;
@@ -208,6 +194,7 @@ ${memoria}
 // 💬 API
 // ─────────────────────────────
 fastify.post('/api/chat', async (req, reply) => {
+
     const { pergunta } = req.body;
 
     try {
@@ -227,7 +214,7 @@ fastify.post('/api/chat', async (req, reply) => {
         console.error(err);
 
         return {
-            texto: "Tive um problema, mas já estou me ajustando.",
+            texto: "Erro interno, mas estou aprendendo.",
             acoes: []
         };
     }
@@ -237,5 +224,5 @@ fastify.post('/api/chat', async (req, reply) => {
 // 🚀 START
 // ─────────────────────────────
 fastify.listen({ port: 3000, host: '0.0.0.0' }, () => {
-    console.log("🚀 KIARA REDIS ONLINE");
+    console.log("🚀 KIARA ONLINE COM MISTRAL + MEMÓRIA");
 });
