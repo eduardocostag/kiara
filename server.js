@@ -1,9 +1,8 @@
-import fastify from 'fastify';
+import express from 'express';
 import path from 'path';
 import fetch from 'node-fetch';
-import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
+// import { MsEdgeTTS, OUTPUT_FORMAT } from 'edge-tts';
 import { Redis } from '@upstash/redis';
-import fastifyStatic from '@fastify/static';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -17,12 +16,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // ─────────────────────────────
-// FASTIFY
+// EXPRESS
 // ─────────────────────────────
-const app = fastify({ logger: true });
+const app = express();
 
 // ─────────────────────────────
-// 🔐 CONFIG
+// MIDDLEWARE
+// ─────────────────────────────
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ─────────────────────────────
+// CONFIG
 // ─────────────────────────────
 const KEYS = {
     MISTRAL: process.env.MISTRAL_KEY
@@ -86,10 +91,7 @@ async function getRelevantMemory(pergunta) {
 // ─────────────────────────────
 // 📁 STATIC
 // ─────────────────────────────
-app.register(fastifyStatic, {
-    root: path.join(__dirname, 'public'),
-    prefix: '/'
-});
+// (já configurado no middleware)
 
 // ─────────────────────────────
 // 🧼 LIMPAR TEXTO
@@ -106,31 +108,32 @@ function limparTexto(texto) {
 // 🎙️ TTS
 // ─────────────────────────────
 async function gerarAudio(texto) {
-    try {
-        const tts = new MsEdgeTTS();
+    // try {
+    //     const tts = new MsEdgeTTS();
 
-        await tts.setMetadata(
-            'pt-BR-FranciscaNeural',
-            OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3
-        );
+    //     await tts.setMetadata(
+    //         'pt-BR-FranciscaNeural',
+    //         OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3
+    //     );
 
-        const textoLimpo = limparTexto(texto);
+    //     const textoLimpo = limparTexto(texto);
 
-        return new Promise((resolve, reject) => {
-            const chunks = [];
-            const { audioStream } = tts.toStream(textoLimpo);
+    //     return new Promise((resolve, reject) => {
+    //         const chunks = [];
+    //         const { audioStream } = tts.toStream(textoLimpo);
 
-            audioStream.on('data', c => chunks.push(c));
-            audioStream.on('end', () => {
-                resolve(Buffer.concat(chunks).toString('base64'));
-            });
-            audioStream.on('error', reject);
-        });
+    //         audioStream.on('data', c => chunks.push(c));
+    //         audioStream.on('end', () => {
+    //             resolve(Buffer.concat(chunks).toString('base64'));
+    //         });
+    //         audioStream.on('error', reject);
+    //     });
 
-    } catch (err) {
-        console.error("Erro TTS:", err);
-        return null;
-    }
+    // } catch (err) {
+    //     console.error("Erro TTS:", err);
+    //     return null;
+    // }
+    return null;
 }
 
 // ─────────────────────────────
@@ -204,7 +207,7 @@ ${memoria}
 // ─────────────────────────────
 // 💬 API
 // ─────────────────────────────
-app.post('/api/chat', async (req, reply) => {
+app.post('/api/chat', async (req, res) => {
     const { pergunta } = req.body;
 
     try {
@@ -214,25 +217,29 @@ app.post('/api/chat', async (req, reply) => {
 
         const audio = await gerarAudio(resposta.texto);
 
-        return {
+        res.json({
             texto: resposta.texto,
             acoes: resposta.acoes || [],
             audio
-        };
+        });
 
     } catch (err) {
         console.error(err);
 
-        return {
+        res.json({
             texto: "Erro interno, mas estou aprendendo.",
             acoes: []
-        };
+        });
     }
 });
 
 // ─────────────────────────────
-// 🚀 START
+// 🚀 START (LOCAL)
 // ─────────────────────────────
-app.listen({ port: 3000, host: '0.0.0.0' }, () => {
-    console.log("🚀 KIARA ONLINE (ESM + MISTRAL + MEMÓRIA)");
-});
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(3000, '0.0.0.0', () => {
+        console.log("🚀 KIARA ONLINE (ESM + MISTRAL + MEMÓRIA)");
+    });
+}
+
+export default app;
