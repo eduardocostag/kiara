@@ -46,10 +46,26 @@ async function getRelevantMemory() {
 
     return data
         .map(item => {
-            const m = safeParse(item);
-            if (!m) return null;
+            try {
+                // se já for objeto válido
+                if (typeof item === "object" && item !== null) {
+                    return `Usuário: ${item.pergunta}\nKIARA: ${item.resposta}`;
+                }
 
-            return `Usuário: ${m.pergunta}\nKIARA: ${m.resposta}`;
+                // se for string
+                if (typeof item === "string") {
+                    // evitar "[object Object]"
+                    if (item === "[object Object]") return null;
+
+                    const m = JSON.parse(item);
+                    return `Usuário: ${m.pergunta}\nKIARA: ${m.resposta}`;
+                }
+
+                return null;
+
+            } catch (e) {
+                return null;
+            }
         })
         .filter(Boolean)
         .join("\n\n");
