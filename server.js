@@ -27,9 +27,14 @@ async function salvarMemoria(pergunta, resposta) {
         time: Date.now()
     };
 
-    await redis.lpush('kiara_memory', JSON.stringify(item));
-    await redis.ltrim('kiara_memory', 0, 99);
-}
+await redis.lpush(
+  'kiara_memory',
+  JSON.stringify({
+    pergunta,
+    resposta,
+    time: Date.now()
+  })
+);
 
 function safeParse(item) {
     if (!item) return null;
