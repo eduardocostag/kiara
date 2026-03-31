@@ -1,35 +1,46 @@
 const fastify = require('fastify')({ logger: true });
 const path = require('path');
-const fs = require('fs');
 const fetch = require('node-fetch');
 const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
+const { Redis } = require('@upstash/redis');
+require('dotenv').config();
 
 // ─────────────────────────────
 // 🔐 CONFIG
 // ─────────────────────────────
 const KEYS = {
-    MISTRAL: "3vK0izdqGclG2LOraceEqtyuyJRtZflO"
+    MISTRAL: process.env.MISTRAL_KEY || "SUA_CHAVE_AQUI"
 };
 
-const MEMORY_FILE = './memory.json';
+const redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN
+});
 
 // ─────────────────────────────
-// 🧠 MEMÓRIA
+// 🧠 MEMÓRIA (REDIS)
 // ─────────────────────────────
-let memory = [];
+async function salvarMemoria(pergunta, resposta) {
+    const item = {
+        pergunta,
+        resposta,
+        time: Date.now()
+    };
 
-if (fs.existsSync(MEMORY_FILE)) {
-    memory = JSON.parse(fs.readFileSync(MEMORY_FILE));
+    await redis.lpush('kiara_memory', JSON.stringify(item));
+
+    // manter só os últimos 100 registros
+    await redis.ltrim('kiara_memory', 0, 99);
 }
 
-function salvarMemoria() {
-    fs.writeFileSync(MEMORY_FILE, JSON.stringify(memory, null, 2));
-}
+async function getRelevantMemory() {
+    const data = await redis.lrange('kiara_memory', 0, 19);
 
-function getRelevantMemory() {
-    return memory
-        .slice(-20)
-        .map(m => `Usuário: ${m.pergunta}\nKIARA: ${m.resposta}`)
+    return data
+        .map(item => {
+            const m = JSON.parse(item);
+            return `Usuário: ${m.pergunta}\nKIARA: ${m.resposta}`;
+        })
         .join("\n\n");
 }
 
@@ -84,36 +95,23 @@ async function gerarAudio(texto) {
 }
 
 // ─────────────────────────────
-// 🧠 IA (COM MULTI-AÇÕES)
+// 🧠 IA
 // ─────────────────────────────
 async function getAI(pergunta) {
 
     const agora = new Date();
 
+    const memoria = await getRelevantMemory();
+
     const system = `
 Você é KIARA, assistente pessoal avançada.
-
-Você pode:
-- executar múltiplas ações
-- navegar como humano
-- lembrar contexto
 
 FORMATO JSON:
 
 {
  "texto": "resposta natural",
- "acoes": [
-   { "tipo": "abrir_site", "dados": {} }
- ]
+ "acoes": []
 }
-
-AÇÕES DISPONÍVEIS:
-
-abrir_site → { "tipo": "abrir_site", "dados": { "url": "" } }
-
-youtube_busca → { "tipo": "youtube_busca", "dados": { "query": "" } }
-
-pesquisa → { "tipo": "pesquisa", "dados": { "query": "" } }
 
 REGRAS:
 - Nunca usar emojis
@@ -121,24 +119,11 @@ REGRAS:
 - Sempre responder em JSON válido
 - Pode retornar múltiplas ações
 
-EXEMPLO:
-
-Usuário: abre youtube e toca lo-fi
-
-Resposta:
-{
- "texto": "Abrindo YouTube e buscando lo-fi",
- "acoes": [
-   { "tipo": "abrir_site", "dados": { "url": "https://youtube.com" }},
-   { "tipo": "youtube_busca", "dados": { "query": "lofi hip hop" }}
- ]
-}
-
 DATA: ${agora.toLocaleDateString('pt-BR')}
 HORA: ${agora.toLocaleTimeString('pt-BR')}
 
 MEMÓRIA:
-${getRelevantMemory()}
+${memoria}
 `;
 
     const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
@@ -179,13 +164,7 @@ fastify.post('/api/chat', async (req, reply) => {
     try {
         const resposta = await getAI(pergunta);
 
-        memory.push({
-            pergunta,
-            resposta: resposta.texto,
-            time: Date.now()
-        });
-
-        salvarMemoria();
+        await salvarMemoria(pergunta, resposta.texto);
 
         const audio = await gerarAudio(resposta.texto);
 
@@ -209,5 +188,5 @@ fastify.post('/api/chat', async (req, reply) => {
 // 🚀 START
 // ─────────────────────────────
 fastify.listen({ port: 3000, host: '0.0.0.0' }, () => {
-    console.log("🚀 KIARA 6.5 FULL AUTOMATION ONLINE");
+    console.log("🚀 KIARA REDIS ONLINE");
 });
