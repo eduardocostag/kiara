@@ -1,8 +1,8 @@
 const fastify = require('fastify')({ logger: true });
 const path = require('path');
 const fs = require('fs');
-const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
 const fetch = require('node-fetch');
+const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
 
 // ─────────────────────────────
 // 🔐 CONFIG
@@ -11,191 +11,203 @@ const KEYS = {
     MISTRAL: "3vK0izdqGclG2LOraceEqtyuyJRtZflO"
 };
 
-let commandQueue = []; // 🔥 fila de comandos para o PC
+const MEMORY_FILE = './memory.json';
+
+// ─────────────────────────────
+// 🧠 MEMÓRIA
+// ─────────────────────────────
+let memory = [];
+
+if (fs.existsSync(MEMORY_FILE)) {
+    memory = JSON.parse(fs.readFileSync(MEMORY_FILE));
+}
+
+function salvarMemoria() {
+    fs.writeFileSync(MEMORY_FILE, JSON.stringify(memory, null, 2));
+}
+
+function getRelevantMemory() {
+    return memory
+        .slice(-20)
+        .map(m => `Usuário: ${m.pergunta}\nKIARA: ${m.resposta}`)
+        .join("\n\n");
+}
 
 // ─────────────────────────────
 // 📁 STATIC
 // ─────────────────────────────
-const publicPath = path.join(__dirname, 'public');
-if (!fs.existsSync(publicPath)) fs.mkdirSync(publicPath);
-
 fastify.register(require('@fastify/static'), {
-    root: publicPath,
-    prefix: '/',
+    root: path.join(__dirname, 'public'),
+    prefix: '/'
 });
 
 // ─────────────────────────────
-// 💾 MEMÓRIA PERSISTENTE
+// 🧼 LIMPAR TEXTO
 // ─────────────────────────────
-const DB_FILE = './memory.json';
-
-function loadMemory() {
-    if (!fs.existsSync(DB_FILE)) return [];
-    return JSON.parse(fs.readFileSync(DB_FILE));
+function limparTexto(texto) {
+    return texto
+        .replace(/[*_`]/g, '')
+        .replace(/[\u{1F600}-\u{1F6FF}]/gu, '')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
-
-function saveMemory(data) {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-}
-
-let conversationHistory = loadMemory();
 
 // ─────────────────────────────
 // 🎙️ TTS
 // ─────────────────────────────
-async function generateAudio(texto) {
+async function gerarAudio(texto) {
     try {
         const tts = new MsEdgeTTS();
+
         await tts.setMetadata(
             'pt-BR-FranciscaNeural',
             OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3
         );
 
+        const textoLimpo = limparTexto(texto);
+
         return new Promise((resolve, reject) => {
             const chunks = [];
-            const { audioStream } = tts.toStream(texto);
+            const { audioStream } = tts.toStream(textoLimpo);
 
-            audioStream.on('data', (c) => chunks.push(c));
-            audioStream.on('end', () =>
-                resolve(Buffer.concat(chunks).toString('base64'))
-            );
+            audioStream.on('data', c => chunks.push(c));
+            audioStream.on('end', () => {
+                resolve(Buffer.concat(chunks).toString('base64'));
+            });
             audioStream.on('error', reject);
         });
 
-    } catch {
+    } catch (err) {
+        console.log("Erro TTS:", err);
         return null;
     }
 }
 
 // ─────────────────────────────
-// 🌐 IA
+// 🧠 IA (COM MULTI-AÇÕES)
 // ─────────────────────────────
-async function getAIResponse(pergunta) {
+async function getAI(pergunta) {
 
     const agora = new Date();
-    const dataAtual = agora.toLocaleDateString('pt-BR');
-    const horaAtual = agora.toLocaleTimeString('pt-BR');
 
-    const systemPrompt = `
-Você é a KIARA 3.0, assistente estilo JARVIS.
+    const system = `
+Você é KIARA, assistente pessoal avançada.
 
-Data: ${dataAtual}
-Hora: ${horaAtual}
+Você pode:
+- executar múltiplas ações
+- navegar como humano
+- lembrar contexto
 
-Responda SEMPRE em JSON:
+FORMATO JSON:
 
 {
-  "texto": "...",
-  "acao": {
-    "tipo": "comando | pesquisa | nenhum",
-    "dados": {}
-  }
+ "texto": "resposta natural",
+ "acoes": [
+   { "tipo": "abrir_site", "dados": {} }
+ ]
 }
 
-COMANDOS:
-- abrir_vscode
-- abrir_navegador
-- listar_arquivos
+AÇÕES DISPONÍVEIS:
+
+abrir_site → { "tipo": "abrir_site", "dados": { "url": "" } }
+
+youtube_busca → { "tipo": "youtube_busca", "dados": { "query": "" } }
+
+pesquisa → { "tipo": "pesquisa", "dados": { "query": "" } }
+
+REGRAS:
+- Nunca usar emojis
+- Nunca usar *
+- Sempre responder em JSON válido
+- Pode retornar múltiplas ações
+
+EXEMPLO:
+
+Usuário: abre youtube e toca lo-fi
+
+Resposta:
+{
+ "texto": "Abrindo YouTube e buscando lo-fi",
+ "acoes": [
+   { "tipo": "abrir_site", "dados": { "url": "https://youtube.com" }},
+   { "tipo": "youtube_busca", "dados": { "query": "lofi hip hop" }}
+ ]
+}
+
+DATA: ${agora.toLocaleDateString('pt-BR')}
+HORA: ${agora.toLocaleTimeString('pt-BR')}
+
+MEMÓRIA:
+${getRelevantMemory()}
 `;
 
-    const messages = [
-        { role: "system", content: systemPrompt },
-        ...conversationHistory.slice(-10),
-        { role: "user", content: pergunta }
-    ];
+    const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${KEYS.MISTRAL}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            model: "mistral-small-latest",
+            messages: [
+                { role: "system", content: system },
+                { role: "user", content: pergunta }
+            ]
+        })
+    });
 
-    try {
-        const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${KEYS.MISTRAL}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: "mistral-small-latest",
-                messages
-            })
-        });
+    const raw = await res.text();
+    console.log("📡 IA RAW:", raw);
 
-        const raw = await res.text();
-        console.log("📡 IA RAW:", raw);
+    const json = JSON.parse(raw);
 
-        const parsed = JSON.parse(raw);
+    let content = json.choices?.[0]?.message?.content;
 
-        if (!parsed.choices || !parsed.choices[0]) {
-            throw new Error("Resposta inválida da IA");
-        }
+    if (!content) throw new Error("IA vazia");
 
-        let content = parsed.choices[0].message.content;
+    content = content.replace(/```json|```/g, '').trim();
 
-        // 🔥 remove ```json
-        content = content.replace(/```json|```/g, '').trim();
-
-        return JSON.parse(content);
-
-    } catch (err) {
-        console.error("🔥 Erro IA:", err.message);
-
-        return {
-            texto: "Tive um problema ao processar sua solicitação, mas já estou me ajustando.",
-            acao: { tipo: "nenhum", dados: {} }
-        };
-    }
+    return JSON.parse(content);
 }
 
 // ─────────────────────────────
-// 🧠 ACTION ENGINE
-// ─────────────────────────────
-function processAction(acao) {
-    if (!acao || acao.tipo === "nenhum") return;
-
-    if (acao.tipo === "comando") {
-        commandQueue.push(acao.dados);
-        console.log("📥 Comando enviado pro cliente:", acao.dados);
-    }
-}
-
-// ─────────────────────────────
-// 📡 API CHAT
+// 💬 API
 // ─────────────────────────────
 fastify.post('/api/chat', async (req, reply) => {
     const { pergunta } = req.body;
 
     try {
-        const resposta = await getAIResponse(pergunta);
+        const resposta = await getAI(pergunta);
 
-        conversationHistory.push({ role: "user", content: pergunta });
-        conversationHistory.push({ role: "assistant", content: resposta.texto });
+        memory.push({
+            pergunta,
+            resposta: resposta.texto,
+            time: Date.now()
+        });
 
-        saveMemory(conversationHistory);
+        salvarMemoria();
 
-        processAction(resposta.acao);
+        const audio = await gerarAudio(resposta.texto);
 
-        const audio = await generateAudio(resposta.texto);
-
-        return { ...resposta, audio };
+        return {
+            texto: resposta.texto,
+            acoes: resposta.acoes || [],
+            audio
+        };
 
     } catch (err) {
-        console.error("🔥 ERRO:", err);
-        return reply.send({
-            texto: "Tive um erro, mas já estou me ajustando.",
-            acao: { tipo: "nenhum" }
-        });
-    }
-});
+        console.error(err);
 
-// ─────────────────────────────
-// 💻 CLIENT PULL (PC)
-// ─────────────────────────────
-fastify.get('/api/comandos', async () => {
-    const cmds = [...commandQueue];
-    commandQueue = [];
-    return cmds;
+        return {
+            texto: "Tive um problema, mas já estou me ajustando.",
+            acoes: []
+        };
+    }
 });
 
 // ─────────────────────────────
 // 🚀 START
 // ─────────────────────────────
 fastify.listen({ port: 3000, host: '0.0.0.0' }, () => {
-    console.log('🚀 KIARA 3.0 ONLINE');
+    console.log("🚀 KIARA 6.5 FULL AUTOMATION ONLINE");
 });
