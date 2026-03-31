@@ -1,15 +1,31 @@
-const fastify = require('fastify')({ logger: true });
-const path = require('path');
-const fetch = require('node-fetch');
-const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
-const { Redis } = require('@upstash/redis');
-require('dotenv').config();
+import fastify from 'fastify';
+import path from 'path';
+import fetch from 'node-fetch';
+import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
+import { Redis } from '@upstash/redis';
+import fastifyStatic from '@fastify/static';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+dotenv.config();
+
+// ─────────────────────────────
+// CONFIG ES MODULES
+// ─────────────────────────────
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// ─────────────────────────────
+// FASTIFY
+// ─────────────────────────────
+const app = fastify({ logger: true });
 
 // ─────────────────────────────
 // 🔐 CONFIG
 // ─────────────────────────────
 const KEYS = {
-    MISTRAL: process.env.MISTRAL_KEY || "SUA_CHAVE_AQUI"
+    MISTRAL: process.env.MISTRAL_KEY
 };
 
 const redis = new Redis({
@@ -20,8 +36,6 @@ const redis = new Redis({
 // ─────────────────────────────
 // 🧠 MEMÓRIA
 // ─────────────────────────────
-
-// salvar memória
 async function salvarMemoria(pergunta, resposta) {
     await redis.lpush(
         'kiara_memory',
@@ -32,20 +46,17 @@ async function salvarMemoria(pergunta, resposta) {
         })
     );
 }
-// parse seguro
+
 function safeParse(item) {
     if (!item || item === "[object Object]") return null;
 
     try {
-        if (typeof item === "object") return item;
-
-        return JSON.parse(item);
+        return typeof item === "string" ? JSON.parse(item) : item;
     } catch {
         return null;
     }
 }
 
-// buscar memória relevante (INTELIGENTE)
 async function getRelevantMemory(pergunta) {
     const data = await redis.lrange('kiara_memory', 0, 100);
 
@@ -75,7 +86,7 @@ async function getRelevantMemory(pergunta) {
 // ─────────────────────────────
 // 📁 STATIC
 // ─────────────────────────────
-fastify.register(require('@fastify/static'), {
+app.register(fastifyStatic, {
     root: path.join(__dirname, 'public'),
     prefix: '/'
 });
@@ -117,7 +128,7 @@ async function gerarAudio(texto) {
         });
 
     } catch (err) {
-        console.log("Erro TTS:", err);
+        console.error("Erro TTS:", err);
         return null;
     }
 }
@@ -173,32 +184,27 @@ ${memoria}
     try {
         json = JSON.parse(raw);
     } catch {
-        throw new Error("Erro ao parsear resposta da IA");
+        throw new Error("Erro ao parsear resposta da Mistral");
     }
 
     let content = json.choices?.[0]?.message?.content;
 
-    if (!content) throw new Error("IA vazia");
+    if (!content) throw new Error("Resposta vazia da IA");
 
     content = content.replace(/```json|```/g, '').trim();
 
-    let parsed;
-
     try {
-        parsed = JSON.parse(content);
+        return JSON.parse(content);
     } catch {
         console.error("Erro JSON:", content);
-        throw new Error("JSON inválido da IA");
+        throw new Error("Resposta da IA não é JSON válido");
     }
-
-    return parsed;
 }
 
 // ─────────────────────────────
 // 💬 API
 // ─────────────────────────────
-fastify.post('/api/chat', async (req, reply) => {
-
+app.post('/api/chat', async (req, reply) => {
     const { pergunta } = req.body;
 
     try {
@@ -227,6 +233,6 @@ fastify.post('/api/chat', async (req, reply) => {
 // ─────────────────────────────
 // 🚀 START
 // ─────────────────────────────
-fastify.listen({ port: 3000, host: '0.0.0.0' }, () => {
-    console.log("🚀 KIARA ONLINE COM MISTRAL + MEMÓRIA");
+app.listen({ port: 3000, host: '0.0.0.0' }, () => {
+    console.log("🚀 KIARA ONLINE (ESM + MISTRAL + MEMÓRIA)");
 });
