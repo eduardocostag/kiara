@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fetch from 'node-fetch';
-// import { MsEdgeTTS, OUTPUT_FORMAT } from 'edge-tts';
+import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 import { Redis } from '@upstash/redis';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
@@ -20,9 +20,6 @@ const __dirname = dirname(__filename);
 // ─────────────────────────────
 const app = express();
 
-// ─────────────────────────────
-// MIDDLEWARE
-// ─────────────────────────────
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -50,11 +47,11 @@ async function salvarMemoria(pergunta, resposta) {
             time: Date.now()
         })
     );
+
+    await redis.ltrim('kiara_memory', 0, 49);
 }
 
 function safeParse(item) {
-    if (!item || item === "[object Object]") return null;
-
     try {
         return typeof item === "string" ? JSON.parse(item) : item;
     } catch {
@@ -63,21 +60,18 @@ function safeParse(item) {
 }
 
 async function getRelevantMemory(pergunta) {
-    const data = await redis.lrange('kiara_memory', 0, 100);
+    const data = await redis.lrange('kiara_memory', 0, 50);
 
     const palavras = pergunta.toLowerCase().split(" ");
 
     return data
         .map(item => {
             const m = safeParse(item);
-
-            if (!m || !m.pergunta || !m.resposta) return null;
+            if (!m) return null;
 
             const texto = `${m.pergunta} ${m.resposta}`.toLowerCase();
 
-            const relevancia = palavras.filter(p =>
-                texto.includes(p)
-            ).length;
+            const relevancia = palavras.filter(p => texto.includes(p)).length;
 
             return { ...m, relevancia };
         })
@@ -87,11 +81,6 @@ async function getRelevantMemory(pergunta) {
         .map(m => `Usuário: ${m.pergunta}\nKIARA: ${m.resposta}`)
         .join("\n\n");
 }
-
-// ─────────────────────────────
-// 📁 STATIC
-// ─────────────────────────────
-// (já configurado no middleware)
 
 // ─────────────────────────────
 // 🧼 LIMPAR TEXTO
@@ -105,35 +94,45 @@ function limparTexto(texto) {
 }
 
 // ─────────────────────────────
-// 🎙️ TTS
+// 🎙️ TTS (EDGE)
 // ─────────────────────────────
 async function gerarAudio(texto) {
-    // try {
-    //     const tts = new MsEdgeTTS();
+    try {
+        const ELEVENLABS_KEY = process.env.ELEVENLABS_KEY || "0ba797ee7c0ab2e56a5dafe8aa5137ac4561b0c033229323b571427c13cfe9e3";
 
-    //     await tts.setMetadata(
-    //         'pt-BR-FranciscaNeural',
-    //         OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3
-    //     );
+        console.log("Tentando TTS com ElevenLabs...");
 
-    //     const textoLimpo = limparTexto(texto);
+        const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
+            method: 'POST',
+            headers: {
+                'Accept': 'audio/mpeg',
+                'Content-Type': 'application/json',
+                'xi-api-key': ELEVENLABS_KEY
+            },
+            body: JSON.stringify({
+                text: limparTexto(texto),
+                model_id: 'eleven_multilingual_v1',
+                voice_settings: {
+                    stability: 0.5,
+                    similarity_boost: 0.5
+                }
+            })
+        });
 
-    //     return new Promise((resolve, reject) => {
-    //         const chunks = [];
-    //         const { audioStream } = tts.toStream(textoLimpo);
+        console.log("Resposta ElevenLabs:", response.status);
 
-    //         audioStream.on('data', c => chunks.push(c));
-    //         audioStream.on('end', () => {
-    //             resolve(Buffer.concat(chunks).toString('base64'));
-    //         });
-    //         audioStream.on('error', reject);
-    //     });
+        if (!response.ok) {
+            throw new Error(`ElevenLabs error: ${response.status}`);
+        }
 
-    // } catch (err) {
-    //     console.error("Erro TTS:", err);
-    //     return null;
-    // }
-    return null;
+        const arrayBuffer = await response.arrayBuffer();
+        console.log("Áudio gerado, tamanho:", arrayBuffer.byteLength);
+        return Buffer.from(arrayBuffer).toString('base64');
+
+    } catch (err) {
+        console.error("Erro TTS:", err);
+        return null;
+    }
 }
 
 // ─────────────────────────────
@@ -148,9 +147,9 @@ Você é KIARA, assistente inteligente.
 
 IMPORTANTE:
 - Responda APENAS em JSON válido
-- Não use markdown
-- Não use emojis
-- Não use *
+- Nunca use markdown
+- Nunca use emojis
+- Nunca use *
 
 FORMATO:
 
@@ -183,24 +182,23 @@ ${memoria}
     console.log("📡 IA RAW:", raw);
 
     let json;
-
     try {
         json = JSON.parse(raw);
     } catch {
-        throw new Error("Erro ao parsear resposta da Mistral");
+        throw new Error("Erro parse Mistral");
     }
 
     let content = json.choices?.[0]?.message?.content;
 
-    if (!content) throw new Error("Resposta vazia da IA");
+    if (!content) throw new Error("IA vazia");
 
     content = content.replace(/```json|```/g, '').trim();
 
     try {
         return JSON.parse(content);
-    } catch {
-        console.error("Erro JSON:", content);
-        throw new Error("Resposta da IA não é JSON válido");
+    } catch (err) {
+        console.error("Erro JSON IA:", content);
+        throw new Error("Resposta inválida da IA");
     }
 }
 
@@ -220,7 +218,7 @@ app.post('/api/chat', async (req, res) => {
         res.json({
             texto: resposta.texto,
             acoes: resposta.acoes || [],
-            audio
+            audio // base64 (se falhar, será null)
         });
 
     } catch (err) {
@@ -228,17 +226,18 @@ app.post('/api/chat', async (req, res) => {
 
         res.json({
             texto: "Erro interno, mas estou aprendendo.",
-            acoes: []
+            acoes: [],
+            audio: null
         });
     }
 });
 
 // ─────────────────────────────
-// 🚀 START (LOCAL)
+// 🚀 START
 // ─────────────────────────────
 if (process.env.NODE_ENV !== 'production') {
     app.listen(3000, '0.0.0.0', () => {
-        console.log("🚀 KIARA ONLINE (ESM + MISTRAL + MEMÓRIA)");
+        console.log("🚀 KIARA ONLINE (MISTRAL + MEMÓRIA + VOZ)");
     });
 }
 
