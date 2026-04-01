@@ -93,48 +93,41 @@ function limparTexto(texto) {
         .trim();
 }
 
-// ─────────────────────────────
-// 🎙️ TTS (EDGE)
-// ─────────────────────────────
 async function gerarAudio(texto) {
+    if (!texto) return null;
+
     try {
-        const ELEVENLABS_KEY = process.env.ELEVENLABS_KEY || "0ba797ee7c0ab2e56a5dafe8aa5137ac4561b0c033229323b571427c13cfe9e3";
+        const tts = new MsEdgeTTS();
+        await tts.setMetadata(
+            "pt-BR-FranciscaNeural",
+            OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3
+        );
 
-        console.log("Tentando TTS com ElevenLabs...");
+        const textoLimpo = limparTexto(texto);
 
-        const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
-            method: 'POST',
-            headers: {
-                'Accept': 'audio/mpeg',
-                'Content-Type': 'application/json',
-                'xi-api-key': ELEVENLABS_KEY
-            },
-            body: JSON.stringify({
-                text: limparTexto(texto),
-                model_id: 'eleven_multilingual_v1',
-                voice_settings: {
-                    stability: 0.5,
-                    similarity_boost: 0.5
-                }
-            })
+        const { audioStream } = tts.toStream(textoLimpo);
+
+        const chunks = [];
+        await new Promise((resolve, reject) => {
+            audioStream.on('data', (chunk) => chunks.push(chunk));
+            audioStream.on('end', resolve);
+            audioStream.on('error', reject);
         });
 
-        console.log("Resposta ElevenLabs:", response.status);
+        const buffer = Buffer.concat(chunks);
 
-        if (!response.ok) {
-            throw new Error(`ElevenLabs error: ${response.status}`);
+        if (!buffer || buffer.length === 0) {
+            throw new Error("Buffer de áudio retornado vazio");
         }
 
-        const arrayBuffer = await response.arrayBuffer();
-        console.log("Áudio gerado, tamanho:", arrayBuffer.byteLength);
-        return Buffer.from(arrayBuffer).toString('base64');
+        console.log(`✅ Áudio gerado: ${buffer.length} bytes (Francisca)`);
+        return buffer.toString('base64');
 
     } catch (err) {
-        console.error("Erro TTS:", err);
+        console.error("❌ Falha no TTS Francisca:", err.message || err);
         return null;
     }
 }
-
 // ─────────────────────────────
 // 🧠 IA (MISTRAL)
 // ─────────────────────────────
