@@ -1,283 +1,852 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<title>KIARA 6.5 FIX</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KIARA</title>
+  <style>
+    :root{
+      --bg:#000;
+      --text:#e8eefc;
+      --muted:rgba(232,238,252,0.68);
+      --panel:rgba(0,0,0,0.40);
+      --border:rgba(0,255,255,0.18);
+      --accent:#18f0ff;
+      --shadow: 0 18px 60px rgba(0,0,0,0.55);
+    }
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      background: var(--bg);
+      color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      overflow:hidden;
+    }
 
-<style>
-body {
-    margin:0;
-    background:#000;
-    overflow:hidden;
-    font-family:'Segoe UI', sans-serif;
-}
+    canvas#canvas{
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
 
-canvas {
-    position:absolute;
-    width:100%;
-    height:100%;
-}
+    .overlay{
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
 
-.ui {
-    position:absolute;
-    bottom:40px;
-    width:100%;
-    display:flex;
-    justify-content:center;
-}
+    .subtitle{
+      position: absolute;
+      left: 50%;
+      bottom: 110px;
+      transform: translateX(-50%);
+      width: min(920px, calc(100% - 30px));
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+      color: var(--text);
+      white-space: pre-wrap;
+      line-height: 1.35;
+      max-height: 26vh;
+      overflow: auto;
+      pointer-events: auto;
+    }
+    .subtitle.muted{ color: var(--muted); }
 
-input {
-    width:400px;
-    padding:15px 25px;
-    border-radius:40px;
-    border:1px solid rgba(0,255,255,0.2);
-    background:rgba(0,0,0,0.6);
-    color:#0ff;
-    text-align:center;
-}
-</style>
+    .actionStrip{
+      position: absolute;
+      left: 50%;
+      bottom: 70px;
+      transform: translateX(-50%);
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      pointer-events: auto;
+      width: min(920px, calc(100% - 30px));
+      justify-content: center;
+    }
+    .actionStrip.hidden{ display:none; }
+    .btn{
+      padding: 8px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,255,255,0.18);
+      background: rgba(0,0,0,0.45);
+      color: var(--text);
+      cursor:pointer;
+      font-size: 13px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      user-select:none;
+    }
+    .btn.ok{ border-color: rgba(34,197,94,0.35); }
+    .btn.no{ border-color: rgba(255,77,109,0.35); }
+
+    .mic{
+      position:absolute;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      width: 56px;
+      height: 56px;
+      border-radius: 18px;
+      border: 1px solid rgba(0,255,255,0.22);
+      background: rgba(0,0,0,0.55);
+      color: var(--text);
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size: 18px;
+      user-select:none;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      pointer-events: auto;
+    }
+    .mic.on{
+      border-color: rgba(24,240,255,0.55);
+      background: rgba(24,240,255,0.12);
+    }
+
+    .typebox{
+      position:absolute;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      width: min(720px, calc(100% - 30px));
+      display:flex;
+      gap: 10px;
+      align-items:flex-end;
+      padding: 10px;
+      border-radius: 18px;
+      border: 1px solid rgba(0,255,255,0.18);
+      background: rgba(0,0,0,0.55);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      pointer-events: auto;
+    }
+    .typebox.hidden{ display:none; }
+    textarea{
+      flex: 1;
+      resize:none;
+      min-height: 42px;
+      max-height: 140px;
+      padding: 10px;
+      border-radius: 15px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,0.2);
+      color: var(--text);
+      outline:none;
+      font-size: 14px;
+    }
+    textarea::placeholder{ color: rgba(232,238,252,0.45); }
+    .send{
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(24,240,255,0.1);
+      color: var(--text);
+      cursor:pointer;
+      font-size: 16px;
+    }
+  </style>
 </head>
-
 <body>
+  <canvas id="canvas"></canvas>
 
-<canvas id="canvas"></canvas>
+  <button id="toggleChat" class="toggle-chat" title="Abrir/Fechar Conversa">💬</button>
 
-<div class="ui">
-    <input id="input" placeholder="Digite algo ou diga KIARA...">
-</div>
+  <div class="overlay">
+    <div id="chatSidebar" class="chat-sidebar">
+      <div style="font-weight: bold; color: var(--accent); font-size: 14px; letter-spacing: 1px;">KIARA AI</div>
+      <div id="subtitle" class="subtitle muted">Oi, eu sou a KIARA. Pode falar comigo ou digitar.</div>
+      
+      <div id="actionStrip" class="actionStrip hidden"></div>
+
+      <div class="chat-controls">
+        <button id="micBtn" class="mic" title="Voz">🎙</button>
+        <div id="typebox" class="typebox hidden">
+          <textarea id="input" placeholder="Mensagem..."></textarea>
+          <button id="sendBtn" class="send">↵</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
 <script>
-const canvas = document.getElementById('canvas');
-const gl = canvas.getContext('webgl');
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  let orbState = 0; 
+  let particles = [];
 
-// ───────── SHADERS ─────────
-const vs = `
-attribute vec2 pos;
-void main(){
-    gl_Position = vec4(pos,0.0,1.0);
-}
-`;
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener("resize", resize);
+  resize();
 
-const fs = `
-precision highp float;
-
-uniform float time;
-uniform vec2 res;
-uniform float state;
-
-void main(){
-
-    vec2 uv = (gl_FragCoord.xy - 0.5 * res.xy) / res.y;
-    float d = length(uv);
-
-    vec3 col = vec3(0.0);
-
-    // 🔥 CORE (FORTE AGORA)
-    float core = 0.03 / (d + 0.02);
-    col += core * vec3(0.0, 1.0, 1.0);
-
-    // 🟢 IDLE
-    if(state == 0.0){
-        float ring = 0.005 / abs(d - 0.25);
-        col += ring * vec3(0.0, 0.7, 1.0);
+  class Particle {
+    constructor() {
+      this.angle = Math.random() * Math.PI * 2;
+      this.baseDist = Math.random() * 180; 
+      this.dist = this.baseDist;
+      this.size = Math.random() * 1.2 + 0.6; 
+      this.angleSpeed = (Math.random() - 0.5) * 0.02;
+      this.phaseX = Math.random() * Math.PI * 2;
+      this.phaseY = Math.random() * Math.PI * 2;
+      this.offX = 0;
+      this.offY = 0;
     }
 
-    // 🔵 LISTENING
-    if(state == 1.0){
-        float wave = sin(d*20.0 - time*8.0)*0.02;
-        float ring = 0.01 / abs(d - 0.25 + wave);
-        col += ring * vec3(0.0, 1.0, 1.0);
+    update() {
+      const now = Date.now();
+      let speedMult = 1;
+      if (orbState === 1) {
+        speedMult = 1.5;
+      } else if (orbState === 2) {
+        speedMult = 4;
+        this.dist = this.baseDist * 0.8; 
+      } else if (orbState === 3) {
+        speedMult = 1.2;
+        this.dist = this.baseDist + (Math.sin(now * 0.02) * 15 * Math.random());
+      } else {
+        this.dist = this.baseDist;
+      }
+
+      this.angle += this.angleSpeed * speedMult;
+      const currentR = this.dist + Math.sin(now * 0.002) * 5;
+      const baseX = canvas.width / 2 + Math.cos(this.angle) * currentR;
+      const baseY = canvas.height / 2 + Math.sin(this.angle) * currentR;
+
+      // Efeito de afastamento do mouse
+      const dx = baseX - mouse.x;
+      const dy = baseY - mouse.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 100) {
+        const force = (100 - d) / 100;
+        this.offX += (dx / d) * force * 10;
+        this.offY += (dy / d) * force * 10;
+      }
+      this.offX *= 0.9; this.offY *= 0.9;
+
+      this.x = baseX + Math.sin(now * 0.001 + this.phaseX) * 20 + this.offX;
+      this.y = baseY + Math.cos(now * 0.0015 + this.phaseY) * 20 + this.offY;
     }
 
-    // 🟡 THINKING
-    if(state == 2.0){
-        float swirl = sin(atan(uv.y, uv.x)*6.0 + time*2.0);
-        float energy = 0.01 / abs(d - 0.22 + swirl*0.02);
-        col += energy * vec3(0.0, 1.0, 0.6);
+    draw() {
+      const color = "24, 240, 255"; // Cor fixa conforme solicitado
+      ctx.fillStyle = `rgba(${color}, 0.75)`;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
-        col += vec3(0.0,0.5,1.0)*(0.02/(d+0.1));
+  for (let i = 0; i < 250; i++) particles.push(new Particle()); // Mais partículas
+
+  let mouse = { x: -1000, y: -1000 };
+  window.addEventListener("mousemove", (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+  function animate() {
+    ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => { p.update(); p.draw(); });
+    requestAnimationFrame(animate);
+  }
+  animate();
+
+  // ───────────────────────────────────────────────────────────
+  // APP
+  // ───────────────────────────────────────────────────────────
+  const subtitleEl = document.getElementById("subtitle");
+  const actionStrip = document.getElementById("actionStrip");
+  const micBtn = document.getElementById("micBtn");
+  const typebox = document.getElementById("typebox");
+  const input = document.getElementById("input");
+  const sendBtn = document.getElementById("sendBtn");
+  const chatSidebar = document.getElementById("chatSidebar");
+  const toggleChat = document.getElementById("toggleChat");
+
+  toggleChat.addEventListener("click", () => {
+    chatSidebar.classList.toggle("closed");
+  });
+
+  const sessionId = (() => {
+    const key = "kiara_session_id";
+    let v = localStorage.getItem(key);
+    if (!v) {
+      v = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      localStorage.setItem(key, v);
+    }
+    return v;
+  })();
+
+  const currentWorkspaceIdKey = "kiara_workspace_id";
+  let currentWorkspaceId = localStorage.getItem(currentWorkspaceIdKey) || "default";
+
+  const allocKey = "kiara_alloc_url";
+  let currentAllocUrl = localStorage.getItem(allocKey) || "";
+
+  let ws = null;
+  let wsReady = false;
+  let currentRunId = null;
+  let voiceOn = false;
+  let listening = false;
+  let speaking = false;
+  let awaiting = null;
+  let assistantBuffer = "";
+
+  // Screen share (somente por comando)
+  let screenStream = null;
+  let screenTimer = null;
+  const screenVideo = document.createElement("video");
+  screenVideo.muted = true;
+  screenVideo.playsInline = true;
+  screenVideo.style.display = "none";
+  document.body.appendChild(screenVideo);
+
+  function setSubtitle(text, muted=false){
+    subtitleEl.textContent = text || "";
+    subtitleEl.classList.toggle("muted", Boolean(muted));
+  }
+
+  function hideActions(){
+    actionStrip.innerHTML = "";
+    actionStrip.classList.add("hidden");
+  }
+
+  function showButtons(buttons){
+    actionStrip.innerHTML = "";
+    for (const b of buttons) actionStrip.appendChild(b);
+    actionStrip.classList.remove("hidden");
+  }
+
+  function mkBtn(label, cls, onClick){
+    const b = document.createElement("button");
+    b.className = "btn " + (cls || "");
+    b.textContent = label;
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  const audio = new Audio();
+  audio.autoplay = true;
+  audio.onplay = () => { speaking = true; orbState = 3; };
+  audio.onended = () => { speaking = false; orbState = 0; if (voiceOn) startListening(); };
+  audio.onerror = () => { speaking = false; orbState = 0; if (voiceOn) startListening(); };
+
+  function stopAll(){
+    try { audio.pause(); } catch {}
+    try { audio.currentTime = 0; } catch {}
+    speaking = false;
+    awaiting = null;
+    orbState = 0;
+    hideActions();
+    setSubtitle("pronta", true);
+  }
+
+  function normalizeYesNo(t){
+    const s = String(t || "").toLowerCase().trim();
+    if (/^(sim|aprovar|aprova|ok|pode)\b/.test(s)) return "yes";
+    if (/^(não|nao|cancelar|cancela|pare|parar)\b/.test(s)) return "no";
+    return null;
+  }
+
+  function tryOpenUrlNewTab(url){
+    let opened = null;
+    try { opened = window.open(String(url || ""), "_blank", "noopener,noreferrer"); } catch {}
+    // Alguns navegadores retornam WindowProxy mesmo quando bloqueiam; checamos .closed depois.
+    return opened;
+  }
+
+  function actionToUrl(a){
+    if (!a || !a.tipo) return null;
+    if (a.tipo === "abrir_site" && a.dados?.url) return String(a.dados.url);
+    if (a.tipo === "pesquisa" && a.dados?.query) {
+      const q = encodeURIComponent(String(a.dados.query));
+      return `https://www.google.com/search?q=${q}`;
+    }
+    if (a.tipo === "youtube_busca" && a.dados?.query) {
+      const q = encodeURIComponent(String(a.dados.query));
+      return `https://www.youtube.com/results?search_query=${q}`;
+    }
+    return null;
+  }
+
+  async function runClientActions(actions){
+    const failed = [];
+    let openedAny = false;
+
+    for (const a of actions || []) {
+      const url = actionToUrl(a);
+      if (!url) continue;
+
+      const w = tryOpenUrlNewTab(url);
+      if (!w) {
+        failed.push(a);
+        continue;
+      }
+
+      openedAny = true;
+      await new Promise(r => setTimeout(r, 180));
+      try {
+        if (w.closed) failed.push(a);
+      } catch {
+        // ignore
+      }
     }
 
-    // 🟣 SPEAKING
-    if(state == 3.0){
-        float wave = sin(d*25.0 - time*15.0)*0.03;
-        float ring = 0.01 / abs(d - 0.25 + wave);
-        col += ring * vec3(1.0, 0.9, 0.6);
+    // Sempre mostrar botões como fallback (auto-hide) para não depender de pop-up blocker.
+    if (actions && actions.length) {
+      showButtons(renderClientActionButtons(actions));
+      setTimeout(() => hideActions(), 10_000);
     }
 
-    // brilho geral
-    col *= (1.5 - d*2.5);
+    if (failed.length) {
+      setSubtitle("Não consegui abrir automaticamente (bloqueio do navegador). Clique abaixo para abrir.", false);
+    } else if (openedAny) {
+      setSubtitle("Abrindo...", true);
+      setTimeout(() => setSubtitle(assistantBuffer || "pronta", false), 1200);
+    }
+  }
 
-    gl_FragColor = vec4(col,1.0);
-}
-`;
+  function renderClientActionButtons(actions){
+    const btns = [];
+    for (const a of actions || []) {
+      const url = actionToUrl(a);
+      if (!url) continue;
+      let label = "Abrir";
+      if (a.tipo === "pesquisa") label = "Pesquisar";
+      if (a.tipo === "youtube_busca") label = "YouTube";
+      btns.push(mkBtn(`${label}: ${url}`, "", () => runClientActions([a])));
+    }
+    return btns;
+  }
 
-// ───────── WEBGL SETUP ─────────
-function createShader(type,src){
-    const s = gl.createShader(type);
-    gl.shaderSource(s,src);
-    gl.compileShader(s);
-    return s;
-}
+  function connectWs(){
+    if (ws) return;
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    ws = new WebSocket(`${proto}://${location.host}/ws?sessionId=${encodeURIComponent(sessionId)}`);
+    wsReady = false;
+    ws.onopen = () => { wsReady = true; };
+    ws.onclose = () => { wsReady = false; ws = null; };
+    ws.onerror = () => { wsReady = false; };
 
-const program = gl.createProgram();
-gl.attachShader(program, createShader(gl.VERTEX_SHADER,vs));
-gl.attachShader(program, createShader(gl.FRAGMENT_SHADER,fs));
-gl.linkProgram(program);
-gl.useProgram(program);
+    ws.onmessage = async (ev) => {
+      let msg = null;
+      try { msg = JSON.parse(ev.data); } catch {}
+      if (!msg || !msg.type) return;
 
-const buffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([
-    -1,-1, 1,-1, -1,1,
-    -1,1, 1,-1, 1,1
-]),gl.STATIC_DRAW);
+      if (msg.type === "run") {
+        currentRunId = msg.runId || null;
+        assistantBuffer = "";
+        orbState = 2;
+        hideActions();
+        setSubtitle("pensando...", true);
+        return;
+      }
 
-const pos = gl.getAttribLocation(program,'pos');
-gl.enableVertexAttribArray(pos);
-gl.vertexAttribPointer(pos,2,gl.FLOAT,false,0,0);
+      if (msg.type === "assistant_text") {
+        const chunk = String(msg.chunk || "").trim();
+        if (chunk) {
+          assistantBuffer += (assistantBuffer ? " " : "") + chunk;
+        }
+        return;
+      }
 
-const uTime = gl.getUniformLocation(program,'time');
-const uRes = gl.getUniformLocation(program,'res');
-const uState = gl.getUniformLocation(program,'state');
+      if (msg.type === "audio") {
+        if (msg.audio) {
+          try {
+            audio.src = "data:audio/mp3;base64," + msg.audio;
+            await audio.play();
+          } catch {}
+        }
+        return;
+      }
 
-let state = 0;
+      if (msg.type === "actions") {
+        const acoes = Array.isArray(msg.acoes) ? msg.acoes : [];
+        const clientOpen = acoes.filter(a => ["abrir_site","pesquisa","youtube_busca"].includes(a.tipo));
+        if (clientOpen.length) runClientActions(clientOpen);
+        return;
+      }
 
-// ───────── RENDER ─────────
-function render(t){
-    canvas.width = innerWidth;
-    canvas.height = innerHeight;
+      if (msg.type === "pending") {
+        const pend = Array.isArray(msg.pendencias) ? msg.pendencias : [];
+        if (!pend.length) return;
 
-    gl.viewport(0,0,canvas.width,canvas.height);
+        awaiting = { kind:"server_pending", pendencias: pend };
+        showButtons([
+          mkBtn("Aprovar", "ok", () => {
+            const approvals = {};
+            for (const p of pend) approvals[p.id] = true;
+            awaiting = null;
+            ws.send(JSON.stringify({ type:"approval", runId: currentRunId, approvals }));
+            hideActions();
+            setSubtitle("ok, continuando...", true);
+          }),
+          mkBtn("Cancelar", "no", () => {
+            const approvals = {};
+            for (const p of pend) approvals[p.id] = false;
+            awaiting = null;
+            ws.send(JSON.stringify({ type:"approval", runId: currentRunId, approvals }));
+            hideActions();
+            setSubtitle("ok, cancelado.", true);
+          }),
+        ]);
+        return;
+      }
+    };
+  }
 
-    gl.uniform1f(uTime, t*0.001);
-    gl.uniform2f(uRes, canvas.width, canvas.height);
-    gl.uniform1f(uState, state);
+  async function sendText(text){
+    const t = String(text || "").trim();
+    if (!t) return;
 
-    gl.drawArrays(gl.TRIANGLES,0,6);
+    if (tryHandleLocalCommands(t)) return;
 
-    requestAnimationFrame(render);
-}
-requestAnimationFrame(render);
+    connectWs();
+    orbState = 2;
+    hideActions();
+    setSubtitle("pensando...", true);
 
-// ───────── CHAT ─────────
-async function send(text){
+    if (wsReady) {
+      ws.send(
+        JSON.stringify({
+          type: "user_text",
+          text: t,
+          autonoma: true,
+          perfil: null,
+          workspaceId: currentWorkspaceId,
+          alocacaoUrl: currentAllocUrl || null,
+        }),
+      );
+      return;
+    }
 
-    state = 2;
-
-    const res = await fetch('/api/chat',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({pergunta:text})
+    const res = await fetch("/api/chat", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        pergunta: t,
+        sessionId,
+        autonoma: true,
+        tts: "server",
+        workspaceId: currentWorkspaceId,
+        alocacaoUrl: currentAllocUrl || null,
+      }),
     });
-
     const data = await res.json();
+    if (data.audio) {
+      try { audio.src = "data:audio/mp3;base64," + data.audio; await audio.play(); } catch {}
+    }
+    if (data.acoes && data.acoes.length) {
+      const clientOpen = data.acoes.filter(a => ["abrir_site","pesquisa","youtube_busca"].includes(a.tipo));
+      if (clientOpen.length) runClientActions(clientOpen);
+    }
+  }
 
-    if(data.audio){
-        state = 3;
+  async function startScreenShare(){
+    if (screenStream) return;
+    connectWs();
+    try {
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    } catch {
+      setSubtitle("Não consegui iniciar o compartilhamento de tela. Verifique permissões do navegador.", false);
+      return;
+    }
 
-        const audio = new Audio("data:audio/mp3;base64,"+data.audio);
-        audio.play();
+    setSubtitle("Ok. Estou recebendo sua tela. Pergunte: 'o que você está vendo?'", false);
+    screenVideo.srcObject = screenStream;
+    await screenVideo.play();
 
-        audio.onended = ()=>{
-            state = 0;
-        };
+    const canvas2 = document.createElement("canvas");
+    const ctx2 = canvas2.getContext("2d");
+
+    screenTimer = setInterval(async () => {
+      try {
+        const vw = screenVideo.videoWidth || 0;
+        const vh = screenVideo.videoHeight || 0;
+        if (!vw || !vh) return;
+
+        const targetW = 640;
+        const scale = targetW / vw;
+        const targetH = Math.max(1, Math.round(vh * scale));
+        canvas2.width = targetW;
+        canvas2.height = targetH;
+        ctx2.drawImage(screenVideo, 0, 0, targetW, targetH);
+
+        const dataUrl = canvas2.toDataURL("image/jpeg", 0.6);
+        const base64 = dataUrl.split(",")[1];
+
+        if (wsReady) {
+          ws.send(JSON.stringify({ type: "screen_frame", imageBase64Jpeg: base64, w: targetW, h: targetH }));
+        } else {
+          const res = await fetch("/api/screen/frame", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId, imageBase64Jpeg: base64, w: targetW, h: targetH }),
+          });
+          if (res.status === 403) {
+            await stopScreenShare();
+            setSubtitle("Tela está desativada no servidor. Ative com KIARA_ENABLE_SCREEN=1.", false);
+          }
+        }
+      } catch {}
+    }, 1100);
+
+    const track = screenStream.getVideoTracks()[0];
+    if (track) track.addEventListener("ended", () => stopScreenShare());
+  }
+
+  async function stopScreenShare(){
+    if (screenTimer) { clearInterval(screenTimer); screenTimer = null; }
+    if (screenStream) { for (const t of screenStream.getTracks()) t.stop(); screenStream = null; }
+    try {
+      await fetch("/api/screen/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      });
+    } catch {}
+  }
+
+  // SpeechRecognition
+  function getSpeechRecognition(){
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  }
+  let recognition = null;
+  let interimCache = "";
+  let interimLastAt = 0;
+  let silenceTimer = null;
+  let lastAutoSent = "";
+  let lastHeardAt = 0;
+  let lastFinal = "";
+  let suspendAutoRestart = false;
+
+  function scheduleSilenceFinalize(){
+    if (!voiceOn) return;
+    if (silenceTimer) clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(()=>tryFinalizeInterimBySilence(), 900);
+  }
+
+  function tryFinalizeInterimBySilence(){
+    if (!voiceOn) return;
+    const now = Date.now();
+    if (!interimCache) return;
+    if (now - interimLastAt < 750) return;
+    const candidate = interimCache.trim();
+    interimCache = "";
+
+    const normalized = candidate.toLowerCase().replace(/\s+/g, " ").trim();
+    if (!normalized || normalized.length < 3) return;
+    if (normalized === lastAutoSent) return;
+    lastAutoSent = normalized;
+    if (now - lastHeardAt < 500) return;
+    handleUtterance(candidate);
+  }
+
+  async function handleUtterance(text){
+    const raw = String(text || "").trim();
+    if (!raw) return;
+
+    // barge-in
+    if (speaking) stopAll();
+
+    const lower = raw.toLowerCase().trim();
+    if (lower === "parar" || lower === "pare") { stopAll(); return; }
+    if (lower.startsWith("resumir") || lower.startsWith("resume")) {
+      await sendText("Resuma a conversa até agora em 6 linhas, com ações pendentes e próximos passos.");
+      return;
+    }
+
+    // comando de tela (sem botão)
+    if (lower.includes("ver minha tela") || lower.includes("compartilhar tela") || lower.includes("mostrar tela")) {
+      await startScreenShare();
+      return;
+    }
+    if (lower.includes("parar tela") || lower.includes("fechar tela")) {
+      await stopScreenShare();
+      setSubtitle("Ok. Parei de receber sua tela.", false);
+      return;
+    }
+
+    const yn = normalizeYesNo(raw);
+    if (awaiting && yn) {
+      if (awaiting.kind === "server_pending") {
+        const approvals = {};
+        for (const p of awaiting.pendencias) approvals[p.id] = yn === "yes";
+        awaiting = null;
+        if (wsReady) ws.send(JSON.stringify({ type:"approval", runId: currentRunId, approvals }));
+        hideActions();
+        return;
+      }
+    }
+
+    await sendText(raw);
+  }
+
+  function tryHandleLocalCommands(raw) {
+    const t = String(raw || "").trim();
+    const lower = t.toLowerCase().trim();
+
+    // trocar workspace/cliente/projeto (não precisa mexer na UI)
+    const m1 = lower.match(/^(workspace|cliente|projeto)\s+(.+)$/i);
+    if (m1) {
+      const next = m1[2].trim();
+      currentWorkspaceId = next;
+      localStorage.setItem(currentWorkspaceIdKey, currentWorkspaceId);
+      setSubtitle(`Ok. Workspace atual: ${currentWorkspaceId}`, true);
+      return true;
+    }
+
+    // alocar site para auditorias (sem UI)
+    const m2 = t.match(/^(alocar site|site alocado|alocar)\s+(https?:\/\/\S+)$/i);
+    if (m2) {
+      currentAllocUrl = m2[2].trim();
+      localStorage.setItem(allocKey, currentAllocUrl);
+      setSubtitle(`Ok. Site alocado: ${currentAllocUrl}`, true);
+      return true;
+    }
+
+    if (lower === "qual workspace" || lower === "workspace atual") {
+      setSubtitle(`Workspace atual: ${currentWorkspaceId}`, true);
+      return true;
+    }
+
+    if (lower === "qual site" || lower === "site alocado") {
+      setSubtitle(`Site alocado: ${currentAllocUrl || "(nenhum)"}`, true);
+      return true;
+    }
+
+    return false;
+  }
+
+  function startListening(){
+    if (!voiceOn) return;
+    const SR = getSpeechRecognition();
+    if (!SR) { setSubtitle("Seu navegador não suporta reconhecimento de voz.", true); return; }
+
+    connectWs();
+    suspendAutoRestart = false;
+
+    if (!recognition) {
+      recognition = new SR();
+      recognition.lang = "pt-BR";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => { listening = true; orbState = 1; };
+      recognition.onerror = () => { listening = false; orbState = 0; setSubtitle("erro no microfone", true); };
+      recognition.onend = () => {
+        listening = false;
+        if (voiceOn && !suspendAutoRestart) {
+          setTimeout(()=>{ try { recognition.start(); } catch {} }, 350);
+        }
+      };
+
+      recognition.onresult = (e) => {
+        let interim = "";
+        let finalText = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript || "";
+          if (e.results[i].isFinal) finalText += t;
+          else interim += t;
+        }
+
+        const interimClean = (interim || "").trim();
+        if (interimClean) {
+          if (speaking) stopAll();
+          interimCache = interimClean;
+          interimLastAt = Date.now();
+          scheduleSilenceFinalize();
+        }
+
+        const cleanFinal = (finalText || "").trim();
+        if (cleanFinal) {
+          const now = Date.now();
+          if (now - lastHeardAt < 800 && cleanFinal === lastFinal) return;
+          lastHeardAt = now;
+          lastFinal = cleanFinal;
+          handleUtterance(cleanFinal);
+        }
+      };
+    }
+
+    try { recognition.start(); } catch {}
+  }
+
+  function stopListening(){
+    if (!recognition) return;
+    suspendAutoRestart = true;
+    try { recognition.stop(); } catch {}
+    listening = false;
+    orbState = 0;
+  }
+
+  // UI
+  function openTypebox(){
+    typebox.classList.remove("hidden");
+    setTimeout(()=>input.focus(), 50);
+  }
+  function closeTypebox(){
+    typebox.classList.add("hidden");
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey && typebox.classList.contains("hidden")) {
+      e.preventDefault();
+      openTypebox();
+    }
+    if (e.key === "Escape" && !typebox.classList.contains("hidden")) {
+      e.preventDefault();
+      closeTypebox();
+    }
+  });
+
+  subtitleEl.addEventListener("click", () => openTypebox());
+
+  sendBtn.addEventListener("click", async () => {
+    const t = input.value.trim();
+    if (!t) return;
+    input.value = "";
+    closeTypebox();
+    await sendText(t);
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendBtn.click();
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeTypebox();
+    }
+  });
+
+  micBtn.addEventListener("click", () => {
+    voiceOn = !voiceOn;
+    micBtn.classList.toggle("on", voiceOn);
+    if (voiceOn) {
+      setSubtitle("ouvindo...", true);
+      startListening();
     } else {
-        state = 0;
+      stopListening();
+      setSubtitle("pronta", true);
     }
-}
+  });
 
-// ───────── INPUT ─────────
-document.getElementById('input').addEventListener('keypress', e=>{
-    if(e.key === 'Enter'){
-        send(e.target.value);
-        e.target.value = "";
-    }
-});
-
-// ───────── WAKE WORD ─────────
-const rec = new webkitSpeechRecognition();
-rec.lang = "pt-BR";
-rec.continuous = true;
-
-rec.onresult = (e)=>{
-    const txt = e.results[e.results.length-1][0].transcript.toLowerCase();
-
-    if(txt.includes("kiara")){
-        state = 1;
-
-        setTimeout(()=>{
-            rec.stop();
-
-            const rec2 = new webkitSpeechRecognition();
-            rec2.lang = "pt-BR";
-
-            rec2.onresult = (ev)=>{
-                send(ev.results[0][0].transcript);
-                rec.start();
-            };
-
-            rec2.start();
-
-        },800);
-    }
-};
-
-function executarAcao(acao) {
-    if (!acao) return;
-
-    if (acao.tipo === "comando") {
-
-        if (acao.dados.comando === "abrir_youtube") {
-            window.open("https://youtube.com", "_blank");
-        }
-
-        if (acao.dados.comando === "abrir_site") {
-            window.open(acao.dados.url, "_blank");
-        }
-    }
-
-    if (acao.tipo === "pesquisa") {
-        const q = encodeURIComponent(acao.dados.query);
-        window.open(`https://google.com/search?q=${q}`, "_blank");
-    }
-}
-
-rec.start();
-
-async function executarAcoes(acoes) {
-    if (!acoes || !acoes.length) return;
-
-    for (const acao of acoes) {
-
-        if (acao.tipo === "abrir_site") {
-            window.open(acao.dados.url, "_blank");
-            await delay(1500);
-        }
-
-        if (acao.tipo === "youtube_busca") {
-            const q = encodeURIComponent(acao.dados.query);
-            window.open(`https://www.youtube.com/results?search_query=${q}`, "_blank");
-            await delay(2000);
-        }
-
-        if (acao.tipo === "pesquisa") {
-            const q = encodeURIComponent(acao.dados.query);
-            window.open(`https://google.com/search?q=${q}`, "_blank");
-        }
-    }
-}
-
-function delay(ms) {
-    return new Promise(res => setTimeout(res, ms));
-}
-
-if (resposta.audio) {
-    const audio = new Audio("data:audio/mp3;base64," + resposta.audio);
-    audio.play();
-}
-
+  setSubtitle("Oi, eu sou a KIARA. Pode falar comigo ou digitar.", true);
 </script>
-
 </body>
 </html>
