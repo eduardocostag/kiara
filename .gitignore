@@ -1,5 +1,6 @@
 node_modules/
 .env
-data/
+data/*
+!data/kiara/
+!data/kiara/**
 *.log
-

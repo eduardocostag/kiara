@@ -6,7 +6,6 @@ function esc(s) {
     .replace(/"/g, "&quot;");
 }
 
-<<<<<<< HEAD
 const INLINE_CSS = `
   @import url('https://fonts.googleapis.com/css?family=Antic');
 
@@ -190,14 +189,8 @@ const INLINE_CSS = `
 
 export function buildLandingPageHtml({
   brand = "Sua Marca",
-  headline = "Aumente suas vendas com uma oferta irresistível",
-  subheadline = "Uma proposta clara, prova social e CTA forte, otimizado para conversão.",
-=======
-export function buildLandingPageHtml({
-  brand = "Sua Marca",
-  headline = "Aumente suas vendas com uma oferta irresistível",
-  subheadline = "Uma proposta clara, prova social e CTA forte — otimizado para conversão.",
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
+  headline = "Aumente suas vendas com uma oferta irresistivel",
+  subheadline = "Uma proposta clara, prova social e CTA forte, otimizado para conversao.",
   cta = "Quero falar no WhatsApp",
   whatsapp = "",
   primaryColor = "#1497FC",
@@ -205,12 +198,11 @@ export function buildLandingPageHtml({
   bullets = [],
   faq = [],
 }) {
-<<<<<<< HEAD
   const safeBullets = Array.isArray(bullets) && bullets.length
     ? bullets.slice(0, 6)
     : [
-        "Benefício principal em 1 frase (mensurável)",
-        "Entrega rápida e simples (sem fricção)",
+        "Beneficio principal em 1 frase (mensuravel)",
+        "Entrega rapida e simples (sem friccao)",
         "Prova ou garantia para reduzir risco percebido",
         "Suporte e acompanhamento",
       ];
@@ -218,24 +210,10 @@ export function buildLandingPageHtml({
   const safeFaq = Array.isArray(faq) && faq.length
     ? faq.slice(0, 6)
     : [
-        { q: "Quanto tempo leva para ver resultado?", a: "Depende do cenário. Você terá um plano em 7 dias e execução contínua." },
-        { q: "Funciona para o meu nicho?", a: "Sim, adaptamos proposta, criativos e funil conforme público e oferta." },
-        { q: "Como começamos?", a: "Clique no botão, responda 3 perguntas e agendamos o kickoff." },
+        { q: "Quanto tempo leva para ver resultado?", a: "Depende do cenario. Voce tera um plano em 7 dias e execucao continua." },
+        { q: "Funciona para o meu nicho?", a: "Sim, adaptamos proposta, criativos e funil conforme publico e oferta." },
+        { q: "Como comecamos?", a: "Clique no botao, responda 3 perguntas e agendamos o kickoff." },
       ];
-=======
-  const safeBullets = Array.isArray(bullets) && bullets.length ? bullets.slice(0, 6) : [
-    "Benefício principal em 1 frase (mensurável)",
-    "Entrega rápida e simples (sem fricção)",
-    "Prova/garantia (reduz risco percebido)",
-    "Suporte e acompanhamento",
-  ];
-
-  const safeFaq = Array.isArray(faq) && faq.length ? faq.slice(0, 6) : [
-    { q: "Quanto tempo leva para ver resultado?", a: "Depende do cenário. Você terá um plano em 7 dias e execução contínua." },
-    { q: "Funciona para o meu nicho?", a: "Sim — adaptamos a proposta, criativos e funil conforme público e oferta." },
-    { q: "Como começamos?", a: "Clique no botão, responda 3 perguntas e agendamos o kickoff." },
-  ];
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
   const waLink = whatsapp ? `https://wa.me/${encodeURIComponent(whatsapp.replace(/\D/g, ""))}` : "";
   const ctaHref = waLink || "#form";
@@ -245,17 +223,12 @@ export function buildLandingPageHtml({
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-<<<<<<< HEAD
   <title>${esc(brand)} - ${esc(headline)}</title>
-=======
-  <title>${esc(brand)} — ${esc(headline)}</title>
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   <meta name="description" content="${esc(subheadline)}" />
   <style>
     :root {
       --bg: #081029;
       --card: rgba(20, 38, 77, 0.3);
-<<<<<<< HEAD
       --text: #e9eefc;
       --muted: rgba(233, 238, 252, 0.7);
       --stroke: rgba(18, 118, 219, 0.25);
@@ -265,31 +238,6 @@ export function buildLandingPageHtml({
 
 ${INLINE_CSS}
   </style>
-=======
-      --card2: rgba(20, 38, 77, 0.5);
-      --text: #e9eefc;
-      --muted: rgba(233,238,252,0.7);
-      --stroke: rgba(18, 118, 219, 0.25);
-      --accent: ${esc(primaryColor)};
-      --shadow: 0 18px 60px rgba(0,0,0,0.5);
-    }
-  </style>
-  <style>
-    #particleCanvas {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      z-index: -1;
-      background: var(--bg);
-      opacity: 0.6;
-    }
-    .wrap {
-      position: relative;
-      background: transparent !important;
-    }
-  </style>
-  <link rel="stylesheet" href="/styles/landing.css">
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 </head>
 <body>
   <canvas id="particleCanvas"></canvas>
@@ -306,57 +254,36 @@ ${INLINE_CSS}
         <h1>${esc(headline)}</h1>
         <div class="sub">${esc(subheadline)}</div>
         <div class="row">
-<<<<<<< HEAD
           <a class="btn" href="${esc(ctaHref)}"><strong>${esc(cta)}</strong> <span>&rarr;</span></a>
-=======
-          <a class="btn" href="${esc(ctaHref)}"><strong>${esc(cta)}</strong> <span>→</span></a>
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
-          <a class="btn ghost" href="#faq">Tirar dúvidas</a>
+          <a class="btn ghost" href="#faq">Tirar duvidas</a>
         </div>
         <div class="grid">
           <div class="card mini">
             <h3>Oferta clara</h3>
-            <p>Uma proposta específica, com benefício e prova, sem enrolação.</p>
+            <p>Uma proposta especifica, com beneficio e prova, sem enrolacao.</p>
           </div>
           <div class="card mini">
-            <h3>Menos fricção</h3>
-<<<<<<< HEAD
-            <p>CTA forte e próxima etapa simples para aumentar conversão.</p>
+            <h3>Menos friccao</h3>
+            <p>CTA forte e proxima etapa simples para aumentar conversao.</p>
           </div>
           <div class="card mini">
-            <h3>Métricas</h3>
-            <p>Defina KPI como leads, taxa e CAC e rode testes contínuos.</p>
-=======
-            <p>CTA forte + próxima etapa simples para aumentar conversão.</p>
-          </div>
-          <div class="card mini">
-            <h3>Métricas</h3>
-            <p>Defina KPI (leads, taxa, CAC) e rode testes contínuos.</p>
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
+            <h3>Metricas</h3>
+            <p>Defina KPI como leads, taxa e CAC e rode testes continuos.</p>
           </div>
         </div>
       </div>
 
       <div class="card heroRight" id="form">
-        <div class="kicker">Próximo passo</div>
+        <div class="kicker">Proximo passo</div>
         <h2 style="margin:8px 0 6px;">Responder 3 perguntas</h2>
         <div class="sub">Isso ajuda a personalizar a oferta e acelerar a entrega.</div>
         <ul class="list">
-<<<<<<< HEAD
-          ${safeBullets.map((b) => `<li class="li">✅ ${esc(b)}</li>`).join("\n")}
+          ${safeBullets.map((b) => `<li class="li">OK ${esc(b)}</li>`).join("\n")}
         </ul>
         <div class="row" style="margin-top:14px;">
           <a class="btn" href="${esc(ctaHref)}"><strong>${esc(cta)}</strong> <span>&rarr;</span></a>
-=======
-          ${safeBullets
-            .map((b) => `<li class="li">✅ ${esc(b)}</li>`)
-            .join("\n")}
-        </ul>
-        <div class="row" style="margin-top:14px;">
-          <a class="btn" href="${esc(ctaHref)}"><strong>${esc(cta)}</strong> <span>→</span></a>
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
         </div>
-        <div class="foot">Dica: conecte este CTA ao WhatsApp, Calendly ou formulário.</div>
+        <div class="foot">Dica: conecte este CTA ao WhatsApp, Calendly ou formulario.</div>
       </div>
     </div>
 
@@ -371,60 +298,37 @@ ${INLINE_CSS}
       </div>
     </div>
 
-<<<<<<< HEAD
-    <div class="foot">Gerado pela KIARA • Ajuste copy, cores e CTA conforme sua oferta</div>
+    <div class="foot">Gerado pela KIARA - Ajuste copy, cores e CTA conforme sua oferta</div>
   </div>
 
   <script>
     const canvas = document.getElementById("particleCanvas");
     const ctx = canvas.getContext("2d");
     const particles = [];
-=======
-    <div class="foot">Gerado pela KIARA • Ajuste copy/cores/CTA conforme sua oferta</div>
-  </div>
-
-  <script>
-    const canvas = document.getElementById('particleCanvas');
-    const ctx = canvas.getContext('2d');
-    let particles = [];
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
     function resize() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     }
-<<<<<<< HEAD
 
     window.addEventListener("resize", resize);
-=======
-    window.addEventListener('resize', resize);
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     resize();
 
     class Particle {
       constructor() {
         this.angle = Math.random() * Math.PI * 2;
-<<<<<<< HEAD
         this.dist = Math.random() * 180;
         this.size = Math.random() * 1.2 + 0.6;
-=======
-        this.dist = Math.random() * 180; // Ampliado o orbe
-        this.size = Math.random() * 1.2 + 0.6; // Partículas menores
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
         this.speed = (Math.random() - 0.5) * 0.01;
         this.opacity = Math.random() * 0.5 + 0.2;
         this.phaseX = Math.random() * Math.PI * 2;
         this.phaseY = Math.random() * Math.PI * 2;
       }
-<<<<<<< HEAD
 
-=======
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
       update() {
         const now = Date.now();
         this.angle += this.speed;
         const pulse = Math.sin(now * 0.002) * 10;
-<<<<<<< HEAD
         const radius = this.dist + pulse;
         const baseX = canvas.width / 2 + Math.cos(this.angle) * radius;
         const baseY = canvas.height / 2 + Math.sin(this.angle) * radius;
@@ -434,26 +338,12 @@ ${INLINE_CSS}
 
       draw() {
         ctx.fillStyle = "rgba(24, 240, 255, " + this.opacity + ")";
-=======
-        const r = this.dist + pulse;
-
-        const baseX = canvas.width / 2 + Math.cos(this.angle) * r;
-        const baseY = canvas.height / 2 + Math.sin(this.angle) * r;
-
-        // Movimento em outras direções além da circular
-        this.x = baseX + Math.sin(now * 0.001 + this.phaseX) * 20;
-        this.y = baseY + Math.cos(now * 0.0015 + this.phaseY) * 20;
-      }
-      draw() {
-        ctx.fillStyle = `rgba(24, 240, 255, ${this.opacity})`;
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
         ctx.fill();
       }
     }
 
-<<<<<<< HEAD
     for (let i = 0; i < 200; i++) particles.push(new Particle());
 
     function animate() {
@@ -466,17 +356,6 @@ ${INLINE_CSS}
       requestAnimationFrame(animate);
     }
 
-=======
-    for (let i = 0; i < 200; i++) particles.push(new Particle()); // Mais partículas
-
-    function animate() {
-      // O fundo da landing page é #081029, usamos a mesma cor com alpha para o rastro
-      ctx.fillStyle = "rgba(8, 16, 41, 0.15)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      particles.forEach(p => { p.update(); p.draw(); });
-      requestAnimationFrame(animate);
-    }
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     animate();
   </script>
 </body>

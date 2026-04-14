@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "agents": [
+    {
+      "slug": "marketing-growth-hacker",
+      "area": "marketing",
+      "title": "Marketing Growth Hacker",
+      "tags": ["marketing", "growth", "seo", "funil", "aquisicao", "conversao"],
+      "priority": 10
+    },
+    {
+      "slug": "marketing-social-media-strategist",
+      "area": "marketing",
+      "title": "Marketing Social Media Strategist",
+      "tags": ["marketing", "social", "instagram", "conteudo", "redes"],
+      "priority": 8
+    },
+    {
+      "slug": "marketing-paid-social-strategist",
+      "area": "marketing",
+      "title": "Marketing Paid Social Strategist",
+      "tags": ["marketing", "meta-ads", "trafego", "paid-social", "campanhas"],
+      "priority": 9
+    },
+    {
+      "slug": "finance-finance-tracker",
+      "area": "financas",
+      "title": "Finance Finance Tracker",
+      "tags": ["financas", "caixa", "orcamento", "despesas", "controle"],
+      "priority": 10
+    },
+    {
+      "slug": "finance-revenue-analyst",
+      "area": "financas",
+      "title": "Finance Revenue Analyst",
+      "tags": ["financas", "receita", "margem", "lucro", "precificacao"],
+      "priority": 9
+    },
+    {
+      "slug": "management-project-shepherd",
+      "area": "gestao",
+      "title": "Management Project Shepherd",
+      "tags": ["gestao", "prioridade", "roadmap", "backlog", "projeto"],
+      "priority": 10
+    },
+    {
+      "slug": "management-operations-manager",
+      "area": "gestao",
+      "title": "Management Operations Manager",
+      "tags": ["gestao", "operacao", "processo", "padronizacao", "rotina"],
+      "priority": 9
+    },
+    {
+      "slug": "sales-sales-strategist",
+      "area": "vendas",
+      "title": "Sales Sales Strategist",
+      "tags": ["vendas", "pipeline", "proposta", "oferta", "lead"],
+      "priority": 10
+    },
+    {
+      "slug": "sales-conversion-closer",
+      "area": "vendas",
+      "title": "Sales Conversion Closer",
+      "tags": ["vendas", "fechamento", "objecoes", "pitch", "conversao"],
+      "priority": 9
+    },
+    {
+      "slug": "technology-backend-architect",
+      "area": "tecnologia",
+      "title": "Technology Backend Architect",
+      "tags": ["tecnologia", "backend", "api", "arquitetura", "integracao"],
+      "priority": 8
+    },
+    {
+      "slug": "technology-automation-architect",
+      "area": "tecnologia",
+      "title": "Technology Automation Architect",
+      "tags": ["tecnologia", "automacao", "agente", "workflow", "playbook"],
+      "priority": 10
+    },
+    {
+      "slug": "infra-linux-systems-engineer",
+      "area": "infraestrutura",
+      "title": "Infra Linux Systems Engineer",
+      "tags": ["infra", "infraestrutura", "linux", "servidor", "systemd", "logs", "permissoes"],
+      "priority": 10
+    },
+    {
+      "slug": "infra-docker-platform-engineer",
+      "area": "infraestrutura",
+      "title": "Infra Docker Platform Engineer",
+      "tags": ["infra", "docker", "compose", "container", "containers", "volumes", "rede"],
+      "priority": 10
+    }
+  ]
+}

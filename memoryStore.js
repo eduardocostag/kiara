@@ -1,9 +1,6 @@
 import path from "path";
 import { createLocalJsonlStore } from "./localStore.js";
-<<<<<<< HEAD
 import { extractSearchTerms, scoreTextMatch } from "./textSearch.js";
-=======
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
 function sanitizeWorkspaceId(id) {
   const raw = String(id || "").trim().toLowerCase();
@@ -11,16 +8,19 @@ function sanitizeWorkspaceId(id) {
   return cleaned || "default";
 }
 
-<<<<<<< HEAD
-=======
-function scoreByKeywords(text, keywords) {
-  if (!text) return 0;
-  const lower = text.toLowerCase();
-  return keywords.reduce((acc, k) => (lower.includes(k) ? acc + 1 : acc), 0);
-}
-
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 export function createMemoryStore({ redis, baseDir }) {
+  async function withRedisTimeout(task, fallback, timeoutMs = 1200) {
+    if (!redis) return fallback;
+    try {
+      return await Promise.race([
+        task(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("redis-timeout")), timeoutMs)),
+      ]);
+    } catch {
+      return fallback;
+    }
+  }
+
   function getLocal(workspaceId) {
     const wid = sanitizeWorkspaceId(workspaceId);
     return createLocalJsonlStore({
@@ -37,39 +37,27 @@ export function createMemoryStore({ redis, baseDir }) {
     const item = { pergunta: String(pergunta), resposta: String(resposta), time: Date.now() };
 
     if (redis) {
-      try {
-        const key = redisKey(workspaceId);
+      const key = redisKey(workspaceId);
+      const savedInRedis = await withRedisTimeout(async () => {
         await redis.lpush(key, JSON.stringify(item));
         await redis.ltrim(key, 0, 199);
-        return;
-      } catch {
-        // fallback local
-      }
+        return true;
+      }, false);
+      if (savedInRedis) return;
     }
 
     const local = getLocal(workspaceId);
     await local.append(item);
   }
 
-<<<<<<< HEAD
   async function loadItems(workspaceId, maxItems) {
     let items = [];
 
     if (redis) {
-      try {
-        const key = redisKey(workspaceId);
+      const key = redisKey(workspaceId);
+      items = await withRedisTimeout(async () => {
         const data = await redis.lrange(key, 0, maxItems);
-=======
-  async function getRelevant(workspaceId, pergunta, { limit = 6 } = {}) {
-    const keywords = String(pergunta).toLowerCase().split(/\s+/).filter(Boolean).slice(0, 20);
-
-    let items = [];
-    if (redis) {
-      try {
-        const key = redisKey(workspaceId);
-        const data = await redis.lrange(key, 0, 240);
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
-        items = data
+        return data
           .map((raw) => {
             try {
               return typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -78,14 +66,11 @@ export function createMemoryStore({ redis, baseDir }) {
             }
           })
           .filter(Boolean);
-      } catch {
-        items = [];
-      }
+      }, []);
     }
 
     if (!items.length) {
       const local = getLocal(workspaceId);
-<<<<<<< HEAD
       items = await local.readAll({ maxLines: maxItems });
     }
 
@@ -118,19 +103,6 @@ export function createMemoryStore({ redis, baseDir }) {
       .sort((a, b) => Number(a.time || 0) - Number(b.time || 0))
       .slice(-limit)
       .map((m) => `Usuario: ${m.pergunta}\nKIARA: ${m.resposta}`)
-=======
-      items = await local.readAll({ maxLines: 800 });
-    }
-
-    return items
-      .map((m) => ({
-        ...m,
-        relevancia: scoreByKeywords(`${m.pergunta} ${m.resposta}`, keywords),
-      }))
-      .sort((a, b) => b.relevancia - a.relevancia)
-      .slice(0, limit)
-      .map((m) => `Usuário: ${m.pergunta}\nKIARA: ${m.resposta}`)
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
       .join("\n\n");
   }
 
@@ -139,9 +111,5 @@ export function createMemoryStore({ redis, baseDir }) {
     return local.filePath;
   }
 
-<<<<<<< HEAD
   return { saveTurn, getRelevant, getRecent, localFile };
-=======
-  return { saveTurn, getRelevant, localFile };
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 }

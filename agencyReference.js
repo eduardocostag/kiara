@@ -1,6 +1,5 @@
 import fs from "fs/promises";
 import path from "path";
-<<<<<<< HEAD
 import { extractSearchTerms } from "./textSearch.js";
 
 const PROFILE_DEFAULTS = {
@@ -10,6 +9,10 @@ const PROFILE_DEFAULTS = {
   vendas: ["sales-conversion-closer", "sales-sales-strategist"],
   tecnologia: ["technology-backend-architect", "technology-automation-architect"],
   automacoes: ["technology-automation-architect"],
+  infraestrutura: ["infra-linux-systems-engineer", "infra-docker-platform-engineer"],
+  infra: ["infra-linux-systems-engineer", "infra-docker-platform-engineer"],
+  linux: ["infra-linux-systems-engineer"],
+  docker: ["infra-docker-platform-engineer"],
   "meta-ads": ["marketing-paid-social-strategist", "marketing-growth-hacker"],
   "paid-social": ["marketing-paid-social-strategist"],
 };
@@ -46,6 +49,19 @@ const KEYWORD_TO_AGENTS = {
   seo: ["marketing-growth-hacker"],
   tecnologia: ["technology-backend-architect"],
   api: ["technology-backend-architect", "technology-automation-architect"],
+  infraestrutura: ["infra-linux-systems-engineer", "infra-docker-platform-engineer"],
+  infra: ["infra-linux-systems-engineer", "infra-docker-platform-engineer"],
+  linux: ["infra-linux-systems-engineer"],
+  ubuntu: ["infra-linux-systems-engineer"],
+  debian: ["infra-linux-systems-engineer"],
+  docker: ["infra-docker-platform-engineer"],
+  compose: ["infra-docker-platform-engineer"],
+  container: ["infra-docker-platform-engineer"],
+  containers: ["infra-docker-platform-engineer"],
+  nginx: ["infra-linux-systems-engineer", "infra-docker-platform-engineer"],
+  systemd: ["infra-linux-systems-engineer"],
+  servidor: ["infra-linux-systems-engineer"],
+  devops: ["infra-linux-systems-engineer", "infra-docker-platform-engineer"],
 };
 
 function uniq(items) {
@@ -63,34 +79,10 @@ function section(md, heading) {
     if (line.trim().startsWith("## ")) break;
     out.push(line);
     if (out.length >= 80) break;
-=======
-
-const PROFILE_TO_FILE = {
-  marketing: ["marketing", "marketing-social-media-strategist.md"],
-  gestao: ["project-management", "project-management-project-shepherd.md"],
-  financas: ["support", "support-finance-tracker.md"],
-  tecnologia: ["engineering", "engineering-backend-architect.md"],
-  automacoes: ["engineering", "engineering-devops-automator.md"],
-  "meta-ads": ["paid-media", "paid-media-paid-social-strategist.md"],
-  "paid-social": ["paid-media", "paid-media-paid-social-strategist.md"],
-};
-
-function extractSection(md, heading) {
-  const lines = md.split("\n");
-  const startIdx = lines.findIndex((l) => l.trim().toLowerCase() === `## ${heading}`.toLowerCase());
-  if (startIdx === -1) return "";
-  const out = [];
-  for (let i = startIdx + 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.trim().startsWith("## ")) break;
-    out.push(line);
-    if (out.length >= 120) break;
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   }
   return out.join("\n").trim();
 }
 
-<<<<<<< HEAD
 async function readAgentFile(baseDir, slug) {
   const filePath = path.join(baseDir, "data", "kiara", "agents", `${slug}.md`);
   const md = await fs.readFile(filePath, "utf8");
@@ -149,29 +141,4 @@ export async function loadAgencyReference({ baseDir, perfil, pergunta = "" }) {
         .join("\n"),
     )
     .join("\n\n---\n\n");
-=======
-export async function loadAgencyReference({ baseDir, perfil }) {
-  const key = String(perfil || "").toLowerCase().trim();
-  const rel = PROFILE_TO_FILE[key];
-  if (!rel) return "";
-
-  const filePath = path.join(baseDir, "vendor", "agency-agents", ...rel);
-  try {
-    const md = await fs.readFile(filePath, "utf8");
-    const role = extractSection(md, "Role Definition");
-    const caps = extractSection(md, "Core Capabilities");
-    const skills = extractSection(md, "Specialized Skills");
-    return [
-      `FONTE: agency-agents/${rel.join("/")}`,
-      role ? `\nROLE DEFINITION:\n${role}` : "",
-      caps ? `\nCORE CAPABILITIES:\n${caps}` : "",
-      skills ? `\nSPECIALIZED SKILLS:\n${skills}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-  } catch {
-    return "";
-  }
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 }

@@ -295,14 +295,64 @@
   const allocKey = "kiara_alloc_url";
   let currentAllocUrl = localStorage.getItem(allocKey) || "";
 
+  const profileKey = "kiara_profile";
+  let currentProfile = localStorage.getItem(profileKey) || "";
+
   let ws = null;
   let wsReady = false;
+  let wsOpenPromise = null;
   let currentRunId = null;
   let voiceOn = false;
   let listening = false;
   let speaking = false;
   let awaiting = null;
   let assistantBuffer = "";
+
+  function debugClient(event, payload = {}) {
+    try {
+      console.log("[KIARA_UI]", event, payload);
+    } catch {}
+  }
+
+  function pickPreferredVoice() {
+    if (!("speechSynthesis" in window)) return null;
+    const voices = window.speechSynthesis.getVoices() || [];
+    const preferredNames = [
+      "Microsoft Francisca",
+      "Francisca",
+      "Google português do Brasil",
+      "Google português",
+      "Maria",
+      "Luciana",
+    ];
+
+    for (const preferred of preferredNames) {
+      const voice = voices.find((item) => String(item.name || "").toLowerCase().includes(preferred.toLowerCase()));
+      if (voice) return voice;
+    }
+
+    return (
+      voices.find((item) => String(item.lang || "").toLowerCase() === "pt-br") ||
+      voices.find((item) => String(item.lang || "").toLowerCase().startsWith("pt")) ||
+      null
+    );
+  }
+
+  function speakPreferredFallback(text) {
+    const content = String(text || "").trim();
+    if (!content || !("speechSynthesis" in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(content);
+      utterance.lang = "pt-BR";
+      utterance.rate = 0.98;
+      utterance.pitch = 1.02;
+      const voice = pickPreferredVoice();
+      if (voice) utterance.voice = voice;
+      window.speechSynthesis.speak(utterance);
+      debugClient("tts.browserFallback", { voice: voice ? voice.name : null });
+    } catch {}
+  }
 
   // Screen share (somente por comando)
   let screenStream = null;
@@ -432,18 +482,21 @@
   }
 
   function connectWs(){
-    if (ws) return;
+    if (ws) return wsOpenPromise || Promise.resolve();
     const proto = location.protocol === "https:" ? "wss" : "ws";
     ws = new WebSocket(`${proto}://${location.host}/ws?sessionId=${encodeURIComponent(sessionId)}`);
     wsReady = false;
-    ws.onopen = () => { wsReady = true; };
-    ws.onclose = () => { wsReady = false; ws = null; };
-    ws.onerror = () => { wsReady = false; };
+    wsOpenPromise = new Promise((resolve) => {
+      ws.onopen = () => { wsReady = true; debugClient("ws.open", { sessionId }); resolve(true); };
+      ws.onerror = () => { wsReady = false; debugClient("ws.error", { sessionId }); resolve(false); };
+    });
+    ws.onclose = () => { wsReady = false; ws = null; wsOpenPromise = null; debugClient("ws.close", { sessionId }); };
 
     ws.onmessage = async (ev) => {
       let msg = null;
       try { msg = JSON.parse(ev.data); } catch {}
       if (!msg || !msg.type) return;
+      debugClient("ws.message", { type: msg.type, runId: msg.runId || null });
 
       if (msg.type === "run") {
         currentRunId = msg.runId || null;
@@ -458,6 +511,7 @@
         const chunk = String(msg.chunk || "").trim();
         if (chunk) {
           assistantBuffer += (assistantBuffer ? " " : "") + chunk;
+          setSubtitle(assistantBuffer, false);
         }
         return;
       }
@@ -467,8 +521,24 @@
           try {
             audio.src = "data:audio/mp3;base64," + msg.audio;
             await audio.play();
-          } catch {}
+          } catch {
+            if (assistantBuffer) {
+              setSubtitle(assistantBuffer, false);
+              orbState = 0;
+              speakPreferredFallback(msg.fallbackText || assistantBuffer);
+            }
+          }
+        } else if (assistantBuffer) {
+          setSubtitle(assistantBuffer, false);
+          orbState = 0;
+          speakPreferredFallback(msg.fallbackText || assistantBuffer);
         }
+        return;
+      }
+
+      if (msg.type === "error") {
+        setSubtitle(`Erro: ${String(msg.error || "falha desconhecida")}`, false);
+        orbState = 0;
         return;
       }
 
@@ -505,6 +575,8 @@
         return;
       }
     };
+
+    return wsOpenPromise;
   }
 
   async function sendText(text){
@@ -513,18 +585,31 @@
 
     if (tryHandleLocalCommands(t)) return;
 
-    connectWs();
+    debugClient("sendText.begin", {
+      text: t.slice(0, 140),
+      wsReady,
+      workspaceId: currentWorkspaceId,
+      profile: currentProfile || null,
+    });
+
+    const wsConnectPromise = connectWs();
     orbState = 2;
     hideActions();
     setSubtitle("pensando...", true);
 
-    if (wsReady) {
+    const wsOpened = await Promise.race([
+      wsConnectPromise || Promise.resolve(false),
+      new Promise((resolve) => setTimeout(() => resolve(false), 700)),
+    ]);
+
+    if (wsReady || wsOpened) {
+      debugClient("sendText.viaWs", { text: t.slice(0, 140) });
       ws.send(
         JSON.stringify({
           type: "user_text",
           text: t,
           autonoma: true,
-          perfil: null,
+          perfil: currentProfile || null,
           workspaceId: currentWorkspaceId,
           alocacaoUrl: currentAllocUrl || null,
         }),
@@ -532,25 +617,50 @@
       return;
     }
 
-    const res = await fetch("/api/chat", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({
-        pergunta: t,
-        sessionId,
-        autonoma: true,
-        tts: "server",
-        workspaceId: currentWorkspaceId,
-        alocacaoUrl: currentAllocUrl || null,
-      }),
-    });
-    const data = await res.json();
-    if (data.audio) {
-      try { audio.src = "data:audio/mp3;base64," + data.audio; await audio.play(); } catch {}
-    }
-    if (data.acoes && data.acoes.length) {
-      const clientOpen = data.acoes.filter(a => ["abrir_site","pesquisa","youtube_busca"].includes(a.tipo));
-      if (clientOpen.length) runClientActions(clientOpen);
+    debugClient("sendText.viaHttp.start", { text: t.slice(0, 140) });
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch("/api/chat", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+          pergunta: t,
+          sessionId,
+          autonoma: true,
+          perfil: currentProfile || null,
+          tts: "none",
+          workspaceId: currentWorkspaceId,
+          alocacaoUrl: currentAllocUrl || null,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      const data = await res.json();
+      debugClient("sendText.viaHttp.finish", {
+        hasTexto: Boolean(String(data.texto || "").trim()),
+        acoes: Array.isArray(data.acoes) ? data.acoes.map((item) => item.tipo) : [],
+        pendencias: Array.isArray(data.pendencias) ? data.pendencias.length : 0,
+      });
+      assistantBuffer = String(data.texto || "").trim();
+      if (assistantBuffer) {
+        setSubtitle(assistantBuffer, false);
+        orbState = 0;
+      } else {
+        setSubtitle("Nao consegui obter resposta agora.", false);
+        orbState = 0;
+      }
+      if (data.audio) {
+        try { audio.src = "data:audio/mp3;base64," + data.audio; await audio.play(); } catch {}
+      }
+      if (data.acoes && data.acoes.length) {
+        const clientOpen = data.acoes.filter(a => ["abrir_site","pesquisa","youtube_busca"].includes(a.tipo));
+        if (clientOpen.length) runClientActions(clientOpen);
+      }
+    } catch (err) {
+      debugClient("sendText.viaHttp.error", { message: String(err?.message || err) });
+      setSubtitle("A resposta demorou demais ou falhou. Tente novamente.", false);
+      orbState = 0;
     }
   }
 
@@ -698,6 +808,39 @@
     const t = String(raw || "").trim();
     const lower = t.toLowerCase().trim();
 
+    const profileMatch = t.match(/^perfil\s+(.+)$/i);
+    if (profileMatch) {
+      const requested = profileMatch[1].trim().toLowerCase();
+      const aliases = {
+        infra: "infraestrutura",
+        infraestrutura: "infraestrutura",
+        linux: "linux",
+        docker: "docker",
+        tecnologia: "tecnologia",
+        automacoes: "automacoes",
+        marketing: "marketing",
+        gestao: "gestao",
+        financas: "financas",
+        vendas: "vendas",
+        professor: "professor",
+        builder: "builder",
+        nenhum: "",
+        normal: "",
+        limpar: "",
+      };
+      if (requested === "atual") {
+        setSubtitle(`Perfil atual: ${currentProfile || "(nenhum)"}`, true);
+        return true;
+      }
+      if (Object.prototype.hasOwnProperty.call(aliases, requested)) {
+        currentProfile = aliases[requested];
+        if (currentProfile) localStorage.setItem(profileKey, currentProfile);
+        else localStorage.removeItem(profileKey);
+        setSubtitle(`Ok. Perfil atual: ${currentProfile || "(nenhum)"}`, true);
+        return true;
+      }
+    }
+
     // trocar workspace/cliente/projeto (não precisa mexer na UI)
     const m1 = lower.match(/^(workspace|cliente|projeto)\s+(.+)$/i);
     if (m1) {
@@ -719,6 +862,11 @@
 
     if (lower === "qual workspace" || lower === "workspace atual") {
       setSubtitle(`Workspace atual: ${currentWorkspaceId}`, true);
+      return true;
+    }
+
+    if (lower === "qual perfil" || lower === "perfil atual") {
+      setSubtitle(`Perfil atual: ${currentProfile || "(nenhum)"}`, true);
       return true;
     }
 

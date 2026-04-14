@@ -1,5 +1,16 @@
 import fetch from "node-fetch";
 
+function timeoutSignal(ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return {
+    signal: controller.signal,
+    clear() {
+      clearTimeout(timer);
+    },
+  };
+}
+
 function normalizeMessages(messages) {
   return Array.isArray(messages)
     ? messages
@@ -24,18 +35,28 @@ async function callMistral({ apiKey, model, messages, temperature = 0.5 }) {
     throw new Error("MISTRAL_KEY nao configurada");
   }
 
-  const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature,
-    }),
-  });
+  const request = timeoutSignal(7000);
+  let res;
+  try {
+    res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+      }),
+      signal: request.signal,
+    });
+  } catch (err) {
+    const message = err?.name === "AbortError" ? "Timeout do Mistral" : err?.message || String(err);
+    throw new Error(message);
+  } finally {
+    request.clear();
+  }
 
   const raw = await res.text();
   let json;
@@ -61,20 +82,30 @@ async function callOllama({ baseUrl, model, messages, temperature = 0.4 }) {
   const resolvedBaseUrl = String(baseUrl || process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434").replace(/\/+$/, "");
   const resolvedModel = model || process.env.OLLAMA_MODEL || "qwen2.5:7b-instruct";
 
-  const res = await fetch(`${resolvedBaseUrl}/api/chat`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: resolvedModel,
-      messages,
-      stream: false,
-      options: {
-        temperature,
+  const request = timeoutSignal(7000);
+  let res;
+  try {
+    res = await fetch(`${resolvedBaseUrl}/api/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    }),
-  });
+      body: JSON.stringify({
+        model: resolvedModel,
+        messages,
+        stream: false,
+        options: {
+          temperature,
+        },
+      }),
+      signal: request.signal,
+    });
+  } catch (err) {
+    const message = err?.name === "AbortError" ? "Timeout do Ollama" : err?.message || String(err);
+    throw new Error(message);
+  } finally {
+    request.clear();
+  }
 
   const raw = await res.text();
   let json;

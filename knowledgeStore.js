@@ -1,18 +1,7 @@
-<<<<<<< HEAD
 import fs from "fs/promises";
 import path from "path";
 import { createLocalJsonlStore } from "./localStore.js";
 import { extractSearchTerms, scoreTextMatch } from "./textSearch.js";
-=======
-import path from "path";
-import { createLocalJsonlStore } from "./localStore.js";
-
-function scoreByKeywords(text, keywords) {
-  if (!text) return 0;
-  const lower = text.toLowerCase();
-  return keywords.reduce((acc, k) => (lower.includes(k) ? acc + 1 : acc), 0);
-}
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
 function sanitizeWorkspaceId(id) {
   const raw = String(id || "").trim().toLowerCase();
@@ -20,14 +9,15 @@ function sanitizeWorkspaceId(id) {
   return cleaned || "default";
 }
 
-<<<<<<< HEAD
 function classifyKnowledge(tags = [], text = "") {
   const bag = `${Array.isArray(tags) ? tags.join(" ") : ""} ${text}`.toLowerCase();
   if (/\b(financ|caixa|margem|lucro|receita|orcamento)\b/.test(bag)) return "finance";
   if (/\b(venda|comercial|lead|pipeline|proposta|fechamento)\b/.test(bag)) return "sales";
   if (/\b(marketing|copy|conteudo|trafego|seo|anuncio|meta ads|instagram)\b/.test(bag)) return "marketing";
   if (/\b(gestao|processo|operacao|roadmap|prioridade|backlog)\b/.test(bag)) return "management";
-  if (/\b(api|automacao|arquitetura|backend|frontend|tecnologia|codigo|integracao)\b/.test(bag)) return "technology";
+  if (/\b(api|automacao|arquitetura|backend|frontend|tecnologia|codigo|integracao|linux|docker|container|servidor|infra)\b/.test(bag)) {
+    return "technology";
+  }
   if (/\b(preferencia|gosta|prefere|estilo|tom de voz)\b/.test(bag)) return "memory";
   return "business";
 }
@@ -73,9 +63,18 @@ async function readTextFilesDeep(rootDir) {
 export function createKnowledgeStore({ redis, baseDir }) {
   const globalKnowledgeRoot = path.join(baseDir, "data", "kiara", "knowledge");
 
-=======
-export function createKnowledgeStore({ redis, baseDir }) {
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
+  async function withRedisTimeout(task, fallback, timeoutMs = 1200) {
+    if (!redis) return fallback;
+    try {
+      return await Promise.race([
+        task(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("redis-timeout")), timeoutMs)),
+      ]);
+    } catch {
+      return fallback;
+    }
+  }
+
   function getLocal(workspaceId) {
     const wid = sanitizeWorkspaceId(workspaceId);
     return createLocalJsonlStore({
@@ -88,7 +87,6 @@ export function createKnowledgeStore({ redis, baseDir }) {
     return `kiara_knowledge:${sanitizeWorkspaceId(workspaceId)}`;
   }
 
-<<<<<<< HEAD
   async function appendStructuredKnowledge(category, title, content, knowledgeType = "nota") {
     const safeCategory = classifyKnowledge([category], `${title}\n${content}`);
     const targetDir = path.join(globalKnowledgeRoot, safeCategory);
@@ -116,36 +114,20 @@ export function createKnowledgeStore({ redis, baseDir }) {
       titulo: title,
       conteudo: content,
       tags: normalizedTags,
-=======
-  async function addNote(workspaceId, { titulo, conteudo, tags = [] }) {
-    const item = {
-      tipo: "nota",
-      titulo: String(titulo || "").slice(0, 200),
-      conteudo: String(conteudo || "").slice(0, 50_000),
-      tags: Array.isArray(tags) ? tags.map(String).slice(0, 20) : [],
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
       time: Date.now(),
     };
 
     if (redis) {
-      try {
-        const key = redisKey(workspaceId);
+      const key = redisKey(workspaceId);
+      await withRedisTimeout(async () => {
         await redis.lpush(key, JSON.stringify(item));
         await redis.ltrim(key, 0, 799);
-<<<<<<< HEAD
-      } catch {
-        // fallback local continues
-=======
-        return;
-      } catch {
-        // fallback local
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
-      }
+        return true;
+      }, false);
     }
 
     const local = getLocal(workspaceId);
     await local.append(item);
-<<<<<<< HEAD
 
     try {
       await appendStructuredKnowledge(
@@ -160,19 +142,12 @@ export function createKnowledgeStore({ redis, baseDir }) {
   }
 
   async function loadWorkspaceItems(workspaceId) {
-=======
-  }
-
-  async function search(workspaceId, query, { limit = 6 } = {}) {
-    const keywords = String(query).toLowerCase().split(/\s+/).filter(Boolean).slice(0, 20);
-
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     let items = [];
     if (redis) {
-      try {
-        const key = redisKey(workspaceId);
+      const key = redisKey(workspaceId);
+      items = await withRedisTimeout(async () => {
         const data = await redis.lrange(key, 0, 900);
-        items = data
+        return data
           .map((raw) => {
             try {
               return typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -181,9 +156,7 @@ export function createKnowledgeStore({ redis, baseDir }) {
             }
           })
           .filter(Boolean);
-      } catch {
-        items = [];
-      }
+      }, []);
     }
 
     if (!items.length) {
@@ -191,7 +164,6 @@ export function createKnowledgeStore({ redis, baseDir }) {
       items = await local.readAll({ maxLines: 1200 });
     }
 
-<<<<<<< HEAD
     return items;
   }
 
@@ -215,26 +187,12 @@ export function createKnowledgeStore({ redis, baseDir }) {
       .sort((a, b) => b.relevancia - a.relevancia)
       .filter((k) => k.relevancia > 0)
       .slice(0, limit);
-=======
-    const ranked = items
-      .map((k) => ({
-        ...k,
-        relevancia: scoreByKeywords(`${k.titulo} ${k.conteudo} ${(k.tags || []).join(" ")}`, keywords),
-      }))
-      .sort((a, b) => b.relevancia - a.relevancia)
-      .slice(0, limit)
-      .filter((k) => k.relevancia > 0);
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
     return ranked
       .map((k) => {
         const tags = Array.isArray(k.tags) && k.tags.length ? `Tags: ${k.tags.join(", ")}` : "";
-<<<<<<< HEAD
         const source = k.path ? `Fonte: ${path.relative(baseDir, k.path).replace(/\\/g, "/")}` : "";
         return [`NOTA: ${k.titulo}`, tags, source, k.conteudo].filter(Boolean).join("\n").trim();
-=======
-        return `NOTA: ${k.titulo}\n${tags}\n${k.conteudo}`.trim();
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
       })
       .join("\n\n");
   }

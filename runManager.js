@@ -1,31 +1,48 @@
 import path from "path";
 import fs from "fs/promises";
 import { extractJsonObject } from "./json.js";
-<<<<<<< HEAD
 import { chatCompletions } from "./llm.js";
-import { localChatCompletion } from "./localBrain.js";
+import { localChatCompletion, shouldShortCircuitLocally } from "./localBrain.js";
 import { buildToolsPrompt, CLIENT_ACTIONS, executeServerAction, actionRequiresApproval } from "./tools.js";
 import { loadAgencyReference } from "./agencyReference.js";
 import { createWorkspaceStore } from "./workspaceStore.js";
 import { createWorldStateStore } from "./worldStateStore.js";
 import { createMissionStore } from "./missionStore.js";
-=======
-import { mistralChatCompletions } from "./mistral.js";
-import { buildToolsPrompt, CLIENT_ACTIONS, executeServerAction, actionRequiresApproval } from "./tools.js";
-import { loadAgencyReference } from "./agencyReference.js";
-import { createWorkspaceStore } from "./workspaceStore.js";
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
 function getRuns() {
   if (!globalThis.__KIARA_RUNS) globalThis.__KIARA_RUNS = new Map();
   return globalThis.__KIARA_RUNS;
 }
 
+function shouldUseRemoteLlm() {
+  return process.env.KIARA_REMOTE_LLM !== "0";
+}
+
+function getDebugLog() {
+  if (!globalThis.__KIARA_DEBUG_LOG) globalThis.__KIARA_DEBUG_LOG = [];
+  return globalThis.__KIARA_DEBUG_LOG;
+}
+
+function debugRun(event, payload = {}) {
+  const entry = {
+    ts: new Date().toISOString(),
+    event,
+    ...payload,
+  };
+  const log = getDebugLog();
+  log.push(entry);
+  if (log.length > 300) log.shift();
+  try {
+    console.log("[KIARA_DEBUG]", JSON.stringify(entry));
+  } catch {
+    console.log("[KIARA_DEBUG]", event);
+  }
+}
+
 function newId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-<<<<<<< HEAD
 function uniqueGoals(items) {
   return [...new Set((items || []).filter(Boolean))].slice(0, 6);
 }
@@ -34,46 +51,28 @@ function inferMissionTitle(question) {
   return String(question || "").trim().replace(/\s+/g, " ").slice(0, 120) || "Missao da KIARA";
 }
 
-=======
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 function profilePrompt(perfil) {
   const p = String(perfil || "").toLowerCase().trim();
   if (!p) return "";
 
   const map = {
-<<<<<<< HEAD
     marketing: "Especialista em marketing (copy, funil, trafego, SEO, conteudo, CRM, analise de concorrencia).",
     gestao: "Especialista em gestao (processos, OKRs, priorizacao, operacao, lideranca, produtividade).",
     financas: "Especialista em financas (orcamento, fluxo de caixa, valuation, metricas, precificacao, risco).",
     automacoes: "Especialista em automacoes (APIs, integracoes, scripts, RPA, no-code/low-code, tarefas recorrentes).",
     tecnologia: "Especialista em tecnologia (arquitetura, dev, seguranca, cloud, dados, boas praticas).",
+    infraestrutura: "Especialista em infraestrutura (Linux, Docker, redes, processos, logs, deploy, servidores, troubleshooting).",
+    infra: "Especialista em infraestrutura (Linux, Docker, redes, processos, logs, deploy, servidores, troubleshooting).",
+    linux: "Especialista em Linux (usuarios, permissoes, processos, servicos, logs, shell e administracao de servidores).",
+    docker: "Especialista em Docker (containers, imagens, compose, redes, volumes, troubleshooting e deploy).",
     "meta-ads": "Especialista em Meta Ads (estrutura de campanhas, publicos, criativos, mensuracao, CAPI, testes, otimizacao).",
     builder: "Especialista em construir aplicacoes (especificacao, arquitetura, backlog, UX minima, implementacao incremental).",
     professor: "Especialista em ensino (explica do zero ao avancado, com exemplos, exercicios e verificacao de entendimento).",
-=======
-    marketing:
-      "Especialista em marketing (copy, funil, tráfego, SEO, conteúdo, CRM, análise de concorrência).",
-    gestao:
-      "Especialista em gestão (processos, OKRs, priorização, operação, liderança, produtividade).",
-    financas:
-      "Especialista em finanças (orçamento, fluxo de caixa, valuation, métricas, precificação, risco).",
-    automacoes:
-      "Especialista em automações (APIs, integrações, scripts, RPA, no-code/low-code, tarefas recorrentes).",
-    tecnologia:
-      "Especialista em tecnologia (arquitetura, dev, segurança, cloud, dados, boas práticas).",
-    "meta-ads":
-      "Especialista em Meta Ads (estrutura de campanhas, públicos, criativos, mensuração, CAPI, testes, otimização).",
-    builder:
-      "Especialista em construir aplicações (especificação, arquitetura, backlog, UX mínima, implementação incremental).",
-    professor:
-      "Especialista em ensino (explica do zero ao avançado, com exemplos, exercícios e verificação de entendimento).",
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   };
 
   return map[p] ? `PERFIL: ${map[p]}` : `PERFIL: ${perfil}`;
 }
 
-<<<<<<< HEAD
 function formatWorldState(worldState) {
   if (!worldState || typeof worldState !== "object") return "";
   const goals = Array.isArray(worldState.activeGoals) && worldState.activeGoals.length ? `Metas ativas: ${worldState.activeGoals.join(" | ")}` : "";
@@ -132,32 +131,11 @@ POLITICA DE SEGURANCA:
 - Se existir um "site alocado" e o usuario pedir diagnostico/marketing/SEO, use "site_audit" antes de propor o plano quando fizer sentido.
 - Se o usuario pedir criar uma automacao ou agente, proponha um playbook e use "criar_automacao" quando houver valor.
 - Se descobrir padrao de sucesso, regra de negocio importante ou preferencia persistente do usuario, use "salvar_nota" para aprender localmente.
-=======
-function buildSystemPrompt({ memoria, conhecimento, perfil, agencyRef, brainContent }) {
-  return `
-Você é KIARA.
-Uma IA autônoma projetada para agir sem supervisão constante.
-
-Seu "Cérebro" (kiara_brain.md) é sua lei absoluta. Antes de cada resposta, consulte suas diretrizes.
-
-${profilePrompt(perfil)}
-
-POLÍTICA DE SEGURANÇA:
-- Para ações arriscadas (browser_run, escrever_arquivo, executar_shell), SEMPRE peça aprovação antes de executar.
-- Para automação em sites, prefira "pesquisar_web" + "navegar". Use "browser_run" apenas quando necessário interagir (cliques/inputs) e respeite a allowlist de domínios.
-- Só use "salvar_nota" se o usuário pedir para lembrar, ou se for um aprendizado genérico (sem dados pessoais/segredos).
-- Seja analítica: explique hipóteses, métricas e o porquê das decisões (marketing/finanças).
-- Para "buscar leads": peça nicho + região e, se quiser "abertas recentemente", peça um ano/data. Use a ação "buscar_leads" e devolva lista com fonte; deixe claro que é heurístico via web.
-- Se existir um "site alocado" e o usuário pedir diagnóstico/marketing/SEO, use "site_audit" antes de propor o plano (quando fizer sentido).
-- Se o usuário perguntar "consegue ver minha tela?" ou pedir opinião do que aparece, use "ver_tela" (se a tela estiver ativa).
-- Se o usuário pedir “criar automação/agente”, proponha um playbook e use "criar_automacao" para salvar (workspace) quando útil.
-- **AUTONOMIA E APRENDIZADO**: Se você descobrir um padrão de sucesso, uma regra de negócio imutável ou um erro que não deve ser repetido, use a ferramenta "escrever_arquivo" no caminho "kiara_brain.md" para atualizar suas próprias diretrizes.
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
+- Em infraestrutura, Linux e Docker, siga uma ordem de raciocinio: sintomas, ambiente, servicos, logs, rede, volumes, permissoes, consumo de recursos e rollback.
 
 CONHECIMENTO SALVO:
 ${conhecimento || "(vazio)"}
 
-<<<<<<< HEAD
 CONVERSA RECENTE:
 ${conversaRecente || "(vazia)"}
 
@@ -174,15 +152,6 @@ NUCLEO DE IDENTIDADE (kiara_brain.md):
 ${brainContent || "(vazio)"}
 
 ${agencyRef ? `\nREFERENCIA (agency-agents):\n${agencyRef}\n` : ""}
-=======
-NÚCLEO DE IDENTIDADE (kiara_brain.md):
-${brainContent || "(vazio)"}
-
-MEMÓRIA RECENTE:
-${memoria || "(vazia)"}
-
-${agencyRef ? `\nREFERÊNCIA (agency-agents):\n${agencyRef}\n` : ""}
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
 ${buildToolsPrompt()}
 `.trim();
@@ -206,11 +175,7 @@ function splitActions(acoes) {
 }
 
 function actionLabel(a) {
-<<<<<<< HEAD
   if (!a?.tipo) return "(acao)";
-=======
-  if (!a?.tipo) return "(ação)";
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   if (a.tipo === "browser_run") return `Automatizar site: ${a?.dados?.url || ""}`.trim();
   if (a.tipo === "executar_shell") return `Executar comando: ${a?.dados?.cmd || ""}`.trim();
   if (a.tipo === "escrever_arquivo") return `Escrever arquivo: ${a?.dados?.path || ""}`.trim();
@@ -220,7 +185,6 @@ function actionLabel(a) {
   return a.tipo;
 }
 
-<<<<<<< HEAD
 function formatActionResults(results) {
   return results.map((r) => `ACAO: ${r.tipo}\nOK: ${r.ok}\nRESULTADO:\n${r.result}`).join("\n\n");
 }
@@ -297,8 +261,6 @@ async function updateMissionStore({ missionStore, workspaceId, question, text, r
   });
 }
 
-=======
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 export async function startRun({
   pergunta,
   perfil,
@@ -309,19 +271,19 @@ export async function startRun({
   memoryStore,
   knowledgeStore,
   baseDir,
-<<<<<<< HEAD
   llmConfig,
 }) {
+  debugRun("startRun.begin", {
+    perguntaPreview: String(pergunta || "").slice(0, 140),
+    perfil: perfil || null,
+    autonoma: Boolean(autonoma),
+    workspaceId: workspaceId || null,
+    sessionId: sessionId || null,
+  });
   const safeBaseDir = baseDir || path.resolve(".");
   const workspaces = createWorkspaceStore({ baseDir: safeBaseDir });
   const worldStateStore = createWorldStateStore({ baseDir: safeBaseDir });
   const missionStore = createMissionStore({ baseDir: safeBaseDir });
-=======
-  mistralKey,
-}) {
-  const safeBaseDir = baseDir || path.resolve(".");
-  const workspaces = createWorkspaceStore({ baseDir: safeBaseDir });
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   const wid = workspaces.sanitizeWorkspaceId(workspaceId || sessionId || "default");
   const wsCfg = await workspaces.getWorkspace(wid);
 
@@ -331,18 +293,12 @@ export async function startRun({
   }
 
   const memoria = memoryStore ? await memoryStore.getRelevant(wid, pergunta) : "";
-<<<<<<< HEAD
   const conversaRecente = memoryStore?.getRecent ? await memoryStore.getRecent(wid, { limit: 8 }) : "";
   const conhecimento = knowledgeStore ? await knowledgeStore.search(wid, pergunta) : "";
   const worldState = await worldStateStore.get(wid);
   const missionsData = await missionStore.list(wid);
   const agencyRef = await loadAgencyReference({ baseDir: safeBaseDir, perfil, pergunta });
 
-=======
-  const conhecimento = knowledgeStore ? await knowledgeStore.search(wid, pergunta) : "";
-  const agencyRef = await loadAgencyReference({ baseDir: safeBaseDir, perfil });
-  
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   let brainContent = "";
   try {
     const brainPath = path.join(safeBaseDir, "kiara_brain.md");
@@ -361,7 +317,6 @@ export async function startRun({
     wsCfg,
     alocacaoUrl: effectiveAllocUrl ? String(effectiveAllocUrl) : null,
     sessionId: sessionId ? String(sessionId) : null,
-<<<<<<< HEAD
     llmConfig: { ...(llmConfig || {}), model: llmConfig?.model || "mistral-small-latest" },
     temperature: 0.45,
     maxSteps: Boolean(autonoma) ? 5 : 2,
@@ -371,14 +326,6 @@ export async function startRun({
     conhecimento,
     worldState,
     missionsData,
-=======
-    model: "mistral-small-latest",
-    temperature: 0.6,
-    maxSteps: Boolean(autonoma) ? 4 : 1,
-    step: 0,
-    memoria,
-    conhecimento,
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     agencyRef,
     brainContent,
     toolContext: "",
@@ -386,17 +333,18 @@ export async function startRun({
     clientActions: [],
     pending: [],
     baseDir: safeBaseDir,
-<<<<<<< HEAD
     worldStateStore,
     missionStore,
-=======
-    mistralKey,
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     createdAt: Date.now(),
   };
 
   getRuns().set(runId, state);
-<<<<<<< HEAD
+  debugRun("startRun.created", {
+    runId,
+    workspaceId: wid,
+    perfil: perfil || null,
+    maxSteps: state.maxSteps,
+  });
   await state.worldStateStore.set(state.workspaceId, {
     status: "working",
     currentFocus: state.pergunta,
@@ -411,24 +359,23 @@ export async function startRun({
   });
   state.worldState = await state.worldStateStore.get(state.workspaceId);
   state.missionsData = await state.missionStore.list(state.workspaceId);
-=======
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   return continueRun({ runId, approvals: {}, memoryStore, knowledgeStore });
 }
 
 export async function continueRun({ runId, approvals, memoryStore, knowledgeStore }) {
   const state = getRuns().get(String(runId));
   if (!state) {
-<<<<<<< HEAD
+    debugRun("continueRun.missing", { runId });
     return { ok: false, error: "Run nao encontrado (expirou ou reiniciou servidor)" };
   }
 
-=======
-    return { ok: false, error: "Run não encontrado (expirou ou reiniciou servidor)" };
-  }
+  debugRun("continueRun.begin", {
+    runId: state.runId,
+    step: state.step,
+    pendingCount: Array.isArray(state.pending) ? state.pending.length : 0,
+    approvalKeys: approvals && typeof approvals === "object" ? Object.keys(approvals) : [],
+  });
 
-  // Execute pendências aprovadas (ou registre rejeição)
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   if (Array.isArray(state.pending) && state.pending.length) {
     const results = [];
     for (const p of state.pending) {
@@ -437,11 +384,7 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
         results.push({
           tipo: p.action.tipo,
           ok: false,
-<<<<<<< HEAD
           result: `ACAO REJEITADA PELO USUARIO: ${actionLabel(p.action)}`,
-=======
-          result: `AÇÃO REJEITADA PELO USUÁRIO: ${actionLabel(p.action)}`,
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
         });
         continue;
       }
@@ -464,8 +407,11 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
     }
 
     state.pending = [];
-<<<<<<< HEAD
     state.toolContext = appendToolContext(state.toolContext, results);
+    debugRun("continueRun.pending.executed", {
+      runId: state.runId,
+      results: results.map((item) => ({ tipo: item.tipo, ok: item.ok })),
+    });
     await updateWorldStateFromResults({
       worldStateStore: state.worldStateStore,
       workspaceId: state.workspaceId,
@@ -487,17 +433,17 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
     });
     state.worldState = await state.worldStateStore.get(state.workspaceId);
     state.missionsData = await state.missionStore.list(state.workspaceId);
-=======
-    state.toolContext = results
-      .map((r) => `AÇÃO: ${r.tipo}\nOK: ${r.ok}\nRESULTADO:\n${r.result}`)
-      .join("\n\n");
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   }
 
   for (; state.step < state.maxSteps; state.step++) {
+    debugRun("continueRun.loop", {
+      runId: state.runId,
+      step: state.step,
+      maxSteps: state.maxSteps,
+      toolContextSize: String(state.toolContext || "").length,
+    });
     const system = buildSystemPrompt({
       memoria: state.memoria,
-<<<<<<< HEAD
       conversaRecente: state.conversaRecente,
       conhecimento: state.conhecimento,
       worldState: formatWorldState(state.worldState),
@@ -506,12 +452,6 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
       agencyRef: state.agencyRef,
       brainContent: state.brainContent,
       providerName: state.llmConfig?.provider || (state.llmConfig?.ollamaBaseUrl ? "ollama" : "mistral"),
-=======
-      conhecimento: state.conhecimento,
-      perfil: state.perfil,
-      agencyRef: state.agencyRef,
-      brainContent: state.brainContent,
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     });
 
     const messages = [
@@ -519,7 +459,6 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
       {
         role: "user",
         content: [
-<<<<<<< HEAD
           "TAREFA DO USUARIO:",
           state.pergunta,
           state.alocacaoUrl ? `\nSITE ALOCADO (contexto): ${state.alocacaoUrl}` : "",
@@ -527,30 +466,26 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
           Array.isArray(state.wsCfg?.metas) && state.wsCfg.metas.length ? `\nMETAS DO WORKSPACE:\n- ${state.wsCfg.metas.join("\n- ")}` : "",
           state.toolContext ? "\nCONTEXTO DE FERRAMENTAS:\n" + state.toolContext : "",
           state.lastText ? "\nSUA ULTIMA RESPOSTA:\n" + state.lastText : "",
-=======
-          "TAREFA DO USUÁRIO:",
-          state.pergunta,
-          state.alocacaoUrl ? `\nSITE ALOCADO (contexto): ${state.alocacaoUrl}` : "",
-          state.workspaceId ? `\nWORKSPACE: ${state.workspaceId}` : "",
-          Array.isArray(state.wsCfg?.metas) && state.wsCfg.metas.length
-            ? `\nMETAS DO WORKSPACE:\n- ${state.wsCfg.metas.join("\n- ")}`
-            : "",
-          state.toolContext ? "\nCONTEXTO DE FERRAMENTAS:\n" + state.toolContext : "",
-          state.lastText ? "\nSUA ÚLTIMA RESPOSTA:\n" + state.lastText : "",
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
         ]
           .filter(Boolean)
           .join("\n"),
       },
     ];
 
-<<<<<<< HEAD
     let completion;
     try {
+      if (!shouldUseRemoteLlm() || shouldShortCircuitLocally(state.pergunta)) {
+        throw new Error("remote-llm-disabled");
+      }
       completion = await chatCompletions({
         ...state.llmConfig,
         messages,
         temperature: state.temperature,
+      });
+      debugRun("continueRun.llm.remote", {
+        runId: state.runId,
+        provider: completion?.provider || state.llmConfig?.provider || "mistral",
+        model: completion?.model || state.llmConfig?.model || null,
       });
     } catch {
       completion = await localChatCompletion({
@@ -565,29 +500,26 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
           workspaceId: state.workspaceId,
         },
       });
+      debugRun("continueRun.llm.localFallback", {
+        runId: state.runId,
+        shortCircuit: shouldShortCircuitLocally(state.pergunta),
+      });
     }
 
     const { content, raw } = completion;
     const parsed = extractJsonObject(content) || extractJsonObject(raw);
     if (!parsed || typeof parsed !== "object") {
       return { ok: false, error: "Resposta invalida da IA (JSON)", runId: state.runId };
-=======
-    const { content, raw } = await mistralChatCompletions({
-      apiKey: state.mistralKey,
-      model: state.model,
-      messages,
-      temperature: state.temperature,
-    });
-
-    const parsed = extractJsonObject(content) || extractJsonObject(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return { ok: false, error: "Resposta inválida da IA (JSON)", runId: state.runId };
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     }
 
     const texto = typeof parsed.texto === "string" ? parsed.texto : "";
     const acoes = normalizeActions(parsed.acoes);
     state.lastText = texto || state.lastText;
+    debugRun("continueRun.parsed", {
+      runId: state.runId,
+      textoPreview: String(texto || "").slice(0, 140),
+      acoes: acoes.map((item) => item.tipo),
+    });
 
     const { client, server } = splitActions(acoes);
     if (client.length) state.clientActions = state.clientActions.concat(client);
@@ -596,7 +528,6 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
       if (memoryStore) {
         await memoryStore.saveTurn(state.workspaceId, state.pergunta, state.lastText || texto || "Ok.");
       }
-<<<<<<< HEAD
       await state.worldStateStore.set(state.workspaceId, {
         status: "idle",
         currentFocus: state.pergunta,
@@ -607,17 +538,15 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
         summary: state.lastText || texto || state.pergunta,
         nextStep: "Aguardando nova orientacao",
       });
-=======
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
       getRuns().delete(state.runId);
+      debugRun("continueRun.finish.noServerActions", {
+        runId: state.runId,
+        textoPreview: String(state.lastText || "Ok.").slice(0, 140),
+      });
       return { ok: true, runId: state.runId, texto: state.lastText || "Ok.", acoes: state.clientActions };
     }
 
-<<<<<<< HEAD
-=======
-    // Se houver ações que exigem aprovação, pausa e retorna pendências
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     const pending = server.filter((a) => actionRequiresApproval(a.tipo));
     const autoExec = server.filter((a) => !actionRequiresApproval(a.tipo));
 
@@ -640,8 +569,12 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
       }
     }
 
-<<<<<<< HEAD
     state.toolContext = appendToolContext(state.toolContext, autoResults);
+    debugRun("continueRun.autoResults", {
+      runId: state.runId,
+      results: autoResults.map((item) => ({ tipo: item.tipo, ok: item.ok })),
+      pending: pending.map((item) => item.tipo),
+    });
     await updateWorldStateFromResults({
       worldStateStore: state.worldStateStore,
       workspaceId: state.workspaceId,
@@ -673,29 +606,11 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
         openLoops: uniqueGoals(pending.map((item) => actionLabel(item)).concat(state.pergunta)),
       });
       state.worldState = await state.worldStateStore.get(state.workspaceId);
-=======
-    state.toolContext = autoResults.length
-      ? autoResults
-          .map((r) => `AÇÃO: ${r.tipo}\nOK: ${r.ok}\nRESULTADO:\n${r.result}`)
-          .join("\n\n")
-      : "";
-
-    if (pending.length) {
-      state.pending = pending.map((action) => ({
-        id: newId(),
-        action,
-        label: actionLabel(action),
-      }));
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
       return {
         ok: true,
         runId: state.runId,
-<<<<<<< HEAD
         texto: state.lastText || "Preciso de aprovacao para continuar.",
-=======
-        texto: state.lastText || "Preciso de aprovação para continuar.",
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
         acoes: state.clientActions,
         pendencias: state.pending.map((p) => ({ id: p.id, label: p.label, action: p.action })),
       };
@@ -705,14 +620,15 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
   if (memoryStore) {
     await memoryStore.saveTurn(state.workspaceId, state.pergunta, state.lastText || "Ok.");
   }
-<<<<<<< HEAD
   await state.worldStateStore.set(state.workspaceId, {
     status: "idle",
     currentFocus: state.pergunta,
     activeGoals: uniqueGoals([state.pergunta, ...(state.worldState?.activeGoals || [])]),
   });
-=======
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   getRuns().delete(state.runId);
+  debugRun("continueRun.finish.maxSteps", {
+    runId: state.runId,
+    textoPreview: String(state.lastText || "Ok.").slice(0, 140),
+  });
   return { ok: true, runId: state.runId, texto: state.lastText || "Ok.", acoes: state.clientActions };
 }

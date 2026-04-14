@@ -4,9 +4,35 @@ function unique(items) {
   return [...new Set((items || []).filter(Boolean))];
 }
 
+function isGreeting(text) {
+  const lower = String(text || "").toLowerCase().trim();
+  return /^(oi|ola|olá|e ai|ei|hey|bom dia|boa tarde|boa noite|kiara)\b[!.? ]*$/.test(lower);
+}
+
+function isDirectCommand(text) {
+  const lower = String(text || "").toLowerCase().trim();
+  return /\b(abra|abrir|abre|acessa|pesquise|pesquisa|procure|busque)\b/.test(lower);
+}
+
 function detectUrl(text) {
   const match = String(text || "").match(/https?:\/\/[^\s]+/i);
   return match ? match[0] : "";
+}
+
+function resolveNamedSite(text) {
+  const lower = String(text || "").toLowerCase();
+  const sites = [
+    { pattern: /\bgoogle\b/, url: "https://www.google.com" },
+    { pattern: /\byoutube\b/, url: "https://www.youtube.com" },
+    { pattern: /\bgmail\b/, url: "https://mail.google.com" },
+    { pattern: /\bwhatsapp\b/, url: "https://web.whatsapp.com" },
+    { pattern: /\binstagram\b/, url: "https://www.instagram.com" },
+    { pattern: /\bfacebook\b/, url: "https://www.facebook.com" },
+    { pattern: /\blinkedin\b/, url: "https://www.linkedin.com" },
+    { pattern: /\bgithub\b/, url: "https://github.com" },
+    { pattern: /\bgoogle drive\b|\bdrive\b/, url: "https://drive.google.com" },
+  ];
+  return sites.find((item) => item.pattern.test(lower)) || null;
 }
 
 function inferKnowledgeType(text) {
@@ -31,6 +57,7 @@ function buildLearningAction(pergunta) {
   if (/\bvendas|proposta|lead|comercial\b/.test(lower)) tags.push("vendas");
   if (/\bfinanc|caixa|margem|orcamento\b/.test(lower)) tags.push("financas");
   if (/\bgestao|processo|operacao|prioridade\b/.test(lower)) tags.push("gestao");
+  if (/\binfra|infraestrutura|linux|docker|container|servidor|nginx|systemd|compose\b/.test(lower)) tags.push("infraestrutura");
 
   return {
     tipo: "salvar_nota",
@@ -51,6 +78,9 @@ function inferSpecialties(text) {
   if (terms.some((t) => ["financas", "financeiro", "caixa", "margem", "lucro", "receita"].includes(t))) found.push("financas");
   if (terms.some((t) => ["gestao", "processo", "operacao", "prioridade", "roadmap", "backlog"].includes(t))) found.push("gestao");
   if (terms.some((t) => ["tecnologia", "api", "automacao", "agente", "backend", "site"].includes(t))) found.push("tecnologia");
+  if (terms.some((t) => ["infra", "infraestrutura", "linux", "docker", "container", "containers", "compose", "nginx", "systemd", "servidor"].includes(t))) {
+    found.push("infraestrutura");
+  }
   return unique(found);
 }
 
@@ -66,11 +96,43 @@ function inferMissionIntent(lower) {
   return /\b(quero|preciso|meta|objetivo|plano|projeto|missao|missão|organize|resolver|fazer)\b/.test(lower);
 }
 
+function directCommandResponse(pergunta) {
+  const text = String(pergunta || "").trim();
+  const lower = text.toLowerCase();
+  const namedSite = resolveNamedSite(lower);
+
+  if (namedSite && /\b(abra|abrir|abre|acessa|abrir o|abrir a)\b/.test(lower)) {
+    return {
+      texto: `Abrindo ${namedSite.url}.`,
+      acoes: [{ tipo: "abrir_site", dados: { url: namedSite.url } }],
+    };
+  }
+
+  if (/\b(abra|abrir|abre)\b/.test(lower) && /\bhttps?:\/\//.test(lower)) {
+    const url = detectUrl(text);
+    return {
+      texto: `Abrindo ${url}.`,
+      acoes: [{ tipo: "abrir_site", dados: { url } }],
+    };
+  }
+
+  if (/\b(pesquise|pesquisa|procure|busque)\b/.test(lower) && !/\b(a fundo|profundo|detalhado|detalhada)\b/.test(lower)) {
+    const cleanedQuery = text.replace(/\b(pesquise|pesquisa|procure|busque|investigue|ache|descubra)\b/gi, "").trim() || text;
+    return {
+      texto: `Abrindo uma busca por "${cleanedQuery}".`,
+      acoes: [{ tipo: "pesquisa", dados: { query: cleanedQuery } }],
+    };
+  }
+
+  return null;
+}
+
 function buildActionPlan(pergunta, { alocacaoUrl }) {
   const text = String(pergunta || "").trim();
   const lower = text.toLowerCase();
   const explicitUrl = detectUrl(text);
-  const url = explicitUrl || alocacaoUrl || "";
+  const namedSite = resolveNamedSite(text);
+  const url = explicitUrl || namedSite?.url || alocacaoUrl || "";
   const actions = [];
 
   if (/\b(abrir site|abra site|abrir o site|abre o site)\b/.test(lower) && url) {
@@ -168,22 +230,52 @@ export async function localChatCompletion({
   toolContext = "",
   context = {},
 }) {
+  if (isGreeting(pergunta)) {
+    const payload = {
+      texto: "Oi. Estou pronta. Posso conversar, pesquisar, abrir sites, automatizar tarefas e agir com mais profundidade quando voce pedir.",
+      acoes: [],
+    };
+    return {
+      content: JSON.stringify(payload),
+      raw: JSON.stringify(payload),
+      provider: "local",
+      model: "heuristic-local-brain",
+    };
+  }
+
+  const direct = directCommandResponse(pergunta);
+  if (direct) {
+    const payload = {
+      texto: direct.texto,
+      acoes: direct.acoes,
+    };
+    return {
+      content: JSON.stringify(payload),
+      raw: JSON.stringify(payload),
+      provider: "local",
+      model: "heuristic-local-brain",
+    };
+  }
+
   const specialties = inferSpecialties(pergunta);
   let actions = buildActionPlan(pergunta, context);
   const followUp = detectNeedFollowUp(toolContext, pergunta);
   if (followUp) actions = unique([...actions.map((a) => JSON.stringify(a)), JSON.stringify(followUp)]).map((item) => JSON.parse(item));
 
+  const lower = String(pergunta || "").toLowerCase();
+  const isCommandLike = /\b(abra|abrir|abre|pesquise|pesquisa|procure|busque|faça|faca|crie|automatize)\b/.test(lower);
   const responseParts = [];
+
   if (specialties.length) {
     responseParts.push(`Vou tratar isso com foco em ${specialties.join(", ")}.`);
-  } else {
+  } else if (!isCommandLike) {
     responseParts.push("Vou organizar isso de forma pratica e objetiva.");
   }
 
-  const knowledgeSummary = summarizeKnowledge(conhecimento);
+  const knowledgeSummary = isGreeting(pergunta) ? "" : summarizeKnowledge(conhecimento);
   if (knowledgeSummary) {
     responseParts.push("Encontrei contexto local que ajuda na resposta.");
-  } else if (String(memoria || conversaRecente || "").trim()) {
+  } else if (!isCommandLike && String(memoria || conversaRecente || "").trim()) {
     responseParts.push("Tambem vou considerar o que ja apareceu na conversa e na memoria recente.");
   }
 
@@ -193,15 +285,15 @@ export async function localChatCompletion({
 
   if (actions.length) {
     responseParts.push("Ja montei um plano de acoes automaticas para avancar sem depender de improviso.");
-  } else {
+  } else if (!isCommandLike) {
     responseParts.push("Com o contexto atual, consigo te orientar sem acionar ferramentas agora.");
   }
 
-  if (agencyRef) {
+  if (agencyRef && !isCommandLike) {
     responseParts.push("Os agentes especializados locais reforcam a analise.");
   }
 
-  if (inferMissionIntent(String(pergunta || "").toLowerCase())) {
+  if (inferMissionIntent(lower) && !isCommandLike) {
     responseParts.push("Vou tratar isso como uma missao em andamento, nao como uma resposta isolada.");
   }
 
@@ -211,17 +303,20 @@ export async function localChatCompletion({
   if (specialties.includes("financas")) quickGuidance.push("separar caixa, margem e impacto economico");
   if (specialties.includes("gestao")) quickGuidance.push("priorizar proximo passo e reduzir dispersao");
   if (specialties.includes("tecnologia")) quickGuidance.push("mapear ferramentas, fluxo e automacoes");
+  if (specialties.includes("infraestrutura")) {
+    quickGuidance.push("mapear host, containers, servicos, logs, rede, volumes e permissoes antes de propor correcao");
+  }
 
   const texto = [
     responseParts.join(" "),
-    quickGuidance.length ? `Minha leitura inicial e: ${quickGuidance.join("; ")}.` : "",
+    quickGuidance.length && !isCommandLike ? `Minha leitura inicial e: ${quickGuidance.join("; ")}.` : "",
     knowledgeSummary ? `Base local relevante:\n${knowledgeSummary}` : "",
   ]
     .filter(Boolean)
     .join("\n\n");
 
   const payload = {
-    texto,
+    texto: texto || "Entendi. Vou agir com base nisso.",
     acoes: actions,
   };
 
@@ -231,4 +326,8 @@ export async function localChatCompletion({
     provider: "local",
     model: "heuristic-local-brain",
   };
+}
+
+export function shouldShortCircuitLocally(pergunta) {
+  return isGreeting(pergunta) || isDirectCommand(pergunta);
 }

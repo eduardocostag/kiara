@@ -4,10 +4,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import fetch from "node-fetch";
 import { duckDuckGoSearch } from "./webSearch.js";
-<<<<<<< HEAD
 import { deepWebResearch } from "./webResearch.js";
-=======
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 import { runBrowserTask } from "./browserTool.js";
 import { getScreenFrame } from "./screenStore.js";
 import { analyzeImage } from "./vision.js";
@@ -74,11 +71,7 @@ function resolveSafePath(baseDir, relativePath) {
   const base = path.resolve(baseDir);
   const target = path.resolve(baseDir, relativePath);
   if (!target.startsWith(base + path.sep)) {
-<<<<<<< HEAD
     throw new Error("Caminho fora do diretorio permitido");
-=======
-    throw new Error("Caminho fora do diretório permitido");
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   }
   return target;
 }
@@ -89,7 +82,6 @@ FERRAMENTAS (use via "acoes"):
 
 1) abrir_site
   dados: { "url": "https://..." }
-<<<<<<< HEAD
   efeito: o navegador do usuario abre a pagina.
 
 2) pesquisa
@@ -141,7 +133,7 @@ FERRAMENTAS (use via "acoes"):
   efeito: KIARA escreve/substitui um arquivo do projeto.
 
 7) salvar_nota
-  dados: { "titulo": "curto", "conteudo": "texto", "tags": ["marketing","financas"] }
+  dados: { "titulo": "curto", "conteudo": "texto", "tags": ["marketing","financas"], "tipoConhecimento": "nota|preferencia|padrao|fato" }
   efeito: KIARA salva conhecimento local para reutilizar no futuro.
 
 8) executar_shell
@@ -157,98 +149,16 @@ REGRAS:
 }
 
 export async function executeServerAction({ action, baseDir, knowledgeStore, context }) {
-=======
-  efeito: o navegador do usuário abre a página.
-
-2) pesquisa
-  dados: { "query": "texto" }
-  efeito: o navegador do usuário abre diretamente os resultados no Google (URL com ?q=...).
-
-3) youtube_busca
-  dados: { "query": "texto" }
-  efeito: o navegador do usuário abre resultados no YouTube.
-
-4) navegar
-  dados: { "url": "https://...", "objetivo": "o que procurar" }
-  efeito: KIARA baixa o HTML e extrai texto para você.
-
-4b) pesquisar_web
-  dados: { "query": "texto" }
-  efeito: KIARA faz uma busca em tempo real e retorna resultados (títulos/links/snippets).
-
-4c) browser_run
-  dados: { "url": "https://...", "objetivo": "o que fazer", "steps": [ { "action": "click|fill|press|wait|extract", ... } ] }
-  efeito: KIARA automatiza o navegador (Playwright). Requer KIARA_ENABLE_PLAYWRIGHT=1 e allowlist de domínios.
-
-4d) ver_tela
-  dados: { "pergunta": "o que procurar/entender na tela" }
-  efeito: KIARA usa o último frame compartilhado pelo usuário (se habilitado) e descreve/análise.
-
-4e) site_audit
-  dados: { "url": "https://...", "maxPages": 6 } (se url não vier, usa o site alocado do workspace)
-  efeito: KIARA varre sitemap/algumas páginas do site e devolve achados + backlog priorizado.
-
-4f) buscar_leads
-  dados: { "nicho": "ex: clinicas odontologicas", "regiao": "ex: sao paulo", "quantidade": 10, "abertasRecentemente": true, "abertasDepois": "2026" }
-  efeito: KIARA busca na web e tenta montar uma lista com nome/telefone/endereço, possíveis sinais de abertura recente e fonte (heurístico; sem API dedicada).
-
-4g) gerar_landing
-  dados: { "brand": "...", "headline": "...", "subheadline": "...", "cta": "...", "whatsapp": "55...", "primaryColor": "#18f0ff", "niche": "...", "path": "public/landing.html" }
-  efeito: KIARA gera uma landing page HTML e (se habilitado) escreve no projeto.
-
-4h) criar_automacao
-  dados: { "nome": "ex: captar-leads", "objetivo": "o que a automação faz", "url": "https://...", "passos": ["...","..."] }
-  efeito: KIARA gera e salva (em data/workspaces/<workspaceId>/automations) um playbook de automação reutilizável.
-
-5) ler_arquivo
-  dados: { "path": "caminho_relativo" }
-  efeito: KIARA lê um arquivo do projeto (restrito ao diretório do app).
-
-6) escrever_arquivo
-  dados: { "path": "caminho_relativo", "conteudo": "texto" }
-  efeito: KIARA escreve/substitui um arquivo do projeto (restrito ao diretório do app).
-
-7) salvar_nota
-  dados: { "titulo": "curto", "conteudo": "texto", "tags": ["marketing","financas"] }
-  efeito: KIARA salva conhecimento para reutilizar no futuro.
-
-8) executar_shell
-  dados: { "cmd": "..." }
-  efeito: KIARA tenta rodar um comando NO SERVIDOR (desligado por padrão).
-
-REGRAS:
-- Sempre responda APENAS com JSON válido no formato:
-  { "texto": "...", "acoes": [ { "tipo": "...", "dados": { ... } } ] }
-- Se precisar da ferramenta, coloque em "acoes" com "tipo" + "dados".
-- Se não precisar, deixe "acoes": [].
-`.trim();
-}
-
-export async function executeServerAction({
-  action,
-  baseDir,
-  knowledgeStore,
-  context,
-}) {
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   const tipo = action?.tipo;
   const dados = action?.dados || {};
 
   if (!SERVER_ACTIONS.has(tipo)) {
-<<<<<<< HEAD
     return { ok: false, tipo, result: "Acao nao executavel no servidor." };
-=======
-    return { ok: false, tipo, result: "Ação não executável no servidor." };
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   }
 
   if (tipo === "navegar" || tipo === "buscar_url") {
     const url = String(dados.url || "");
-<<<<<<< HEAD
     if (!isHttpUrl(url)) return { ok: false, tipo, result: "URL invalida" };
-=======
-    if (!isHttpUrl(url)) return { ok: false, tipo, result: "URL inválida" };
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
     const res = await fetch(url, {
       method: "GET",
@@ -264,17 +174,12 @@ export async function executeServerAction({
     return {
       ok: true,
       tipo,
-<<<<<<< HEAD
       result: `HTTP ${res.status}\nURL: ${url}\n\nTEXTO EXTRAIDO:\n${text}`,
-=======
-      result: `HTTP ${res.status}\nURL: ${url}\n\nTEXTO EXTRAÍDO:\n${text}`,
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     };
   }
 
   if (tipo === "pesquisar_web") {
     const query = String(dados.query || "");
-<<<<<<< HEAD
     const deep = Boolean(dados.profundo || dados.deep);
 
     if (deep) {
@@ -285,8 +190,6 @@ export async function executeServerAction({
       return { ok: deepResult.ok, tipo, result: deepResult.result };
     }
 
-=======
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     const results = await duckDuckGoSearch(query, { limit: 6 });
     const formatted = results
       .map((r, idx) => {
@@ -324,16 +227,11 @@ export async function executeServerAction({
 
     const frame = getScreenFrame(sessionId);
     if (!frame?.imageBase64Jpeg) {
-<<<<<<< HEAD
       return { ok: false, tipo, result: "Nenhuma tela recebida ainda" };
-=======
-      return { ok: false, tipo, result: "Nenhuma tela recebida ainda (inicie Compartilhar tela)" };
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     }
 
     const userAsk = String(dados.pergunta || "").trim();
     const prompt = [
-<<<<<<< HEAD
       "Voce esta analisando a tela do usuario (captura recente).",
       "",
       "Tarefas:",
@@ -346,34 +244,13 @@ export async function executeServerAction({
       userAsk ? `Pergunta do usuario: ${userAsk}` : "Pergunta do usuario: (nao especificada)",
     ].join("\n");
 
-=======
-      "Você está analisando a tela do usuário (captura recente).",
-      "",
-      "Tarefas:",
-      "1) Descreva o que aparece na tela (apps/janelas, o que o usuário está fazendo).",
-      "2) Extraia informações úteis (títulos, botões/menus relevantes, alertas/erros, números importantes).",
-      "3) Diga o que parece estar dando certo e o que está confuso/errado.",
-      "4) Sugira próximos passos práticos (em bullets, com prioridade).",
-      "5) Se houver dados sensíveis (senhas, chaves, e-mails, números de documento/cartão), NÃO copie; apenas sinalize: 'conteúdo sensível detectado'.",
-      "",
-      userAsk ? `Pergunta do usuário: ${userAsk}` : "Pergunta do usuário: (não especificada)",
-    ].join("\n");
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     const vision = await analyzeImage({
       imageBase64Jpeg: frame.imageBase64Jpeg,
       prompt,
     });
 
     const meta = `FRAME: ${new Date(frame.ts).toISOString()} (${frame.w || "?"}x${frame.h || "?"})`;
-<<<<<<< HEAD
     return { ok: vision.ok, tipo, result: `${meta}\n\n${vision.result}` };
-=======
-    return {
-      ok: vision.ok,
-      tipo,
-      result: `${meta}\n\n${vision.result}`,
-    };
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   }
 
   if (tipo === "site_audit") {
@@ -396,35 +273,22 @@ export async function executeServerAction({
     const regiao = String(dados.regiao || "");
     const quantidade = Math.max(1, Math.min(Number(dados.quantidade || 10) || 10, 30));
     const abertasRecentemente = Boolean(dados.abertasRecentemente || dados.recentes);
-<<<<<<< HEAD
     const abertasDepois = String(dados.abertasDepois || dados.abertasDepoisDe || "").trim();
-=======
-    const abertasDepois = String(dados.abertasDepois || dados.abertasDepoisDe || "").trim(); // "YYYY-MM-DD" ou "YYYY"
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     if (!nicho) return { ok: false, tipo, result: "Nicho ausente" };
 
     const baseSearchFn = async (q) => duckDuckGoSearch(q, { limit: 10 });
     const queries = (() => {
       const base = String(dados.query || "").trim();
       if (base) return [base];
-<<<<<<< HEAD
       if (!abertasRecentemente) return [`contato telefone endereco ${nicho} ${regiao}`.trim()];
-=======
-      if (!abertasRecentemente) return [`contato telefone endereço ${nicho} ${regiao}`.trim()];
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
       const yearHint =
         abertasDepois && /\b20\d{2}\b/.test(abertasDepois)
           ? ` ${abertasDepois.match(/\b20\d{2}\b/)?.[0]}`
           : "";
       return [
-<<<<<<< HEAD
         `inaugurou abriu nova ${nicho} ${regiao} contato telefone endereco${yearHint}`.trim(),
         `inauguracao ${nicho} ${regiao} telefone endereco${yearHint}`.trim(),
-=======
-        `inaugurou abriu nova ${nicho} ${regiao} contato telefone endereço${yearHint}`.trim(),
-        `inauguração ${nicho} ${regiao} telefone endereço${yearHint}`.trim(),
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
       ];
     })();
 
@@ -443,10 +307,6 @@ export async function executeServerAction({
       if (all.length >= quantidade) break;
     }
 
-<<<<<<< HEAD
-=======
-    // Dedup por fonte e limita
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     const seen = new Set();
     const leads = [];
     for (const l of all) {
@@ -458,7 +318,6 @@ export async function executeServerAction({
     }
 
     const text = leads
-<<<<<<< HEAD
       .map((l, i) =>
         [
           `${i + 1}. ${l.nome || "(sem nome)"}`,
@@ -469,29 +328,12 @@ export async function executeServerAction({
         ]
           .filter(Boolean)
           .join("\n"),
-=======
-      .map(
-        (l, i) =>
-          [
-            `${i + 1}. ${l.nome || "(sem nome)"}`,
-            `   Telefone: ${l.telefone || "(não encontrado)"}`,
-            `   Endereço: ${l.endereco || "(não encontrado)"}`,
-            l.abertura?.ano ? `   Sinal de abertura: ${l.abertura.ano}` : l.abertura ? `   Sinal de abertura: (detectado)` : "",
-            `   Fonte: ${l.fonte}`,
-          ]
-            .filter(Boolean)
-            .join("\n"),
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
       )
       .join("\n\n");
 
     const note =
       abertasRecentemente && !leads.length
-<<<<<<< HEAD
         ? "\n\nObs: 'abertas recentemente' e heuristico via web. Se quiser, diga cidade/estado e uma data para refinar."
-=======
-        ? "\n\nObs: 'abertas recentemente' é heurístico via web (inauguração/abertura). Se quiser, diga cidade/estado e uma data (ex: 2026) para refinar."
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
         : "";
     return { ok: true, tipo, result: (text || "(sem leads)") + note };
   }
@@ -513,26 +355,14 @@ export async function executeServerAction({
     if (process.env.KIARA_ENABLE_WRITE_ANY === "1") {
       const target = path.resolve(baseDir, relativePath);
       if (!target.startsWith(path.resolve(baseDir) + path.sep)) {
-<<<<<<< HEAD
         return { ok: false, tipo, result: "Caminho fora do diretorio permitido" };
-=======
-        return { ok: false, tipo, result: "Caminho fora do diretório permitido" };
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
       }
       await fs.mkdir(path.dirname(target), { recursive: true });
       await fs.writeFile(target, html, "utf8");
       return { ok: true, tipo, result: `Landing page escrita em: ${relativePath}` };
     }
 
-<<<<<<< HEAD
     return { ok: true, tipo, result: "Landing gerada (habilite KIARA_ENABLE_WRITE_ANY=1 para escrever no projeto)." };
-=======
-    return {
-      ok: true,
-      tipo,
-      result: "Landing gerada (habilite KIARA_ENABLE_WRITE_ANY=1 para escrever no projeto).",
-    };
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   }
 
   if (tipo === "criar_automacao") {
@@ -550,41 +380,20 @@ export async function executeServerAction({
       .replace(/\s+/g, "-")
       .slice(0, 60);
 
-<<<<<<< HEAD
     const spec = { nome: nome || safeName, objetivo, url, passos, createdAt: new Date().toISOString() };
-=======
-    const spec = {
-      nome: nome || safeName,
-      objetivo,
-      url,
-      passos,
-      createdAt: new Date().toISOString(),
-    };
-
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     const relativePath = path.join("data", "workspaces", workspaceId, "automations", `${safeName || "automacao"}.json`);
 
     if (process.env.KIARA_ENABLE_WRITE === "1") {
       const target = resolveSafePath(baseDir, relativePath);
       await fs.mkdir(path.dirname(target), { recursive: true });
       await fs.writeFile(target, JSON.stringify(spec, null, 2), "utf8");
-<<<<<<< HEAD
       return { ok: true, tipo, result: `Automacao salva em: ${relativePath}` };
-=======
-      return { ok: true, tipo, result: `Automação salva em: ${relativePath}` };
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     }
 
     return {
       ok: true,
       tipo,
-<<<<<<< HEAD
       result: "Automacao gerada (habilite KIARA_ENABLE_WRITE=1 para salvar no projeto).\n\n" + truncate(JSON.stringify(spec, null, 2), 9000),
-=======
-      result:
-        "Automação gerada (habilite KIARA_ENABLE_WRITE=1 para salvar no projeto).\n\n" +
-        truncate(JSON.stringify(spec, null, 2), 9000),
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     };
   }
 
@@ -598,15 +407,7 @@ export async function executeServerAction({
     const normalized = relativePath.replace(/\//g, path.sep);
     const inAllowedRoot = allowedRoots.some((r) => normalized.startsWith(r));
     if (!inAllowedRoot && process.env.KIARA_ENABLE_READ_ANY !== "1") {
-<<<<<<< HEAD
       return { ok: false, tipo, result: "Leitura restrita a public/ e data/ (set KIARA_ENABLE_READ_ANY=1 para liberar)" };
-=======
-      return {
-        ok: false,
-        tipo,
-        result: "Leitura restrita a public/ e data/ (set KIARA_ENABLE_READ_ANY=1 para liberar)",
-      };
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     }
 
     const target = resolveSafePath(baseDir, relativePath);
@@ -623,15 +424,7 @@ export async function executeServerAction({
     const normalized = relativePath.replace(/\//g, path.sep);
     const inDataRoot = normalized.startsWith("data" + path.sep);
     if (!inDataRoot && process.env.KIARA_ENABLE_WRITE_ANY !== "1") {
-<<<<<<< HEAD
       return { ok: false, tipo, result: "Escrita restrita a data/ (set KIARA_ENABLE_WRITE_ANY=1 para liberar)" };
-=======
-      return {
-        ok: false,
-        tipo,
-        result: "Escrita restrita a data/ (set KIARA_ENABLE_WRITE_ANY=1 para liberar)",
-      };
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     }
 
     const target = resolveSafePath(baseDir, relativePath);
@@ -642,15 +435,12 @@ export async function executeServerAction({
   }
 
   if (tipo === "salvar_nota") {
-<<<<<<< HEAD
     if (!knowledgeStore) return { ok: false, tipo, result: "Knowledge store indisponivel" };
-=======
-    if (!knowledgeStore) return { ok: false, tipo, result: "Knowledge store indisponível" };
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     await knowledgeStore.addNote(context?.workspaceId || "default", {
       titulo: dados.titulo,
       conteudo: dados.conteudo,
       tags: dados.tags,
+      tipoConhecimento: dados.tipoConhecimento,
     });
     return { ok: true, tipo, result: "Nota salva" };
   }
@@ -663,31 +453,16 @@ export async function executeServerAction({
     const cmd = String(dados.cmd || "").trim();
     if (!cmd) return { ok: false, tipo, result: "Comando vazio" };
 
-<<<<<<< HEAD
     const [bin, ...args] = cmd.split(/\s+/);
     const allowed = new Set(["node", "npm", "pnpm", "yarn", "git", "python", "python3"]);
     if (!allowed.has(bin)) {
       return { ok: false, tipo, result: `Binario nao permitido: ${bin}` };
-=======
-    // allowlist mínima (evita virar RCE genérico)
-    const [bin, ...args] = cmd.split(/\s+/);
-    const allowed = new Set(["node", "npm", "pnpm", "yarn", "git", "python", "python3"]);
-    if (!allowed.has(bin)) {
-      return { ok: false, tipo, result: `Binário não permitido: ${bin}` };
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     }
 
     const { stdout, stderr } = await execFileAsync(bin, args, { cwd: baseDir, timeout: 60_000 });
     const out = [stdout, stderr].filter(Boolean).join("\n").trim();
-<<<<<<< HEAD
     return { ok: true, tipo, result: truncate(out, 9000) || "(sem saida)" };
   }
 
   return { ok: false, tipo, result: "Acao desconhecida" };
-=======
-    return { ok: true, tipo, result: truncate(out, 9000) || "(sem saída)" };
-  }
-
-  return { ok: false, tipo, result: "Ação desconhecida" };
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 }

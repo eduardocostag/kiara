@@ -15,16 +15,20 @@ function safeJsonParse(raw) {
   }
 }
 
+function withTimeout(task, ms, label) {
+  return Promise.race([
+    task,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label}-timeout-${ms}ms`)), ms)),
+  ]);
+}
+
 export function createHttpAndWsServer({
   app,
   memoryStore,
   knowledgeStore,
   baseDir,
-<<<<<<< HEAD
   llmConfig,
-=======
-  mistralKey,
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
+  logger,
 }) {
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server, path: "/ws" });
@@ -41,17 +45,26 @@ export function createHttpAndWsServer({
     }
 
     attachSocket(sessionId, ws);
+    logger?.info?.("ws.connection.open", { sessionId });
     try {
       ws.send(JSON.stringify({ type: "hello", sessionId }));
     } catch {}
 
-    ws.on("close", () => detachSocket(sessionId, ws));
+    ws.on("close", () => {
+      logger?.info?.("ws.connection.close", { sessionId });
+      detachSocket(sessionId, ws);
+    });
 
     ws.on("message", async (data) => {
       const msg = safeJsonParse(String(data || ""));
       if (!msg || typeof msg.type !== "string") return;
 
       const emit = (payload) => emitToSession(sessionId, payload);
+      await logger?.info?.("ws.message.in", {
+        sessionId,
+        type: msg.type,
+        runId: msg.runId || null,
+      });
 
       if (msg.type === "user_text") {
         const text = String(msg.text || "").trim();
@@ -60,52 +73,49 @@ export function createHttpAndWsServer({
         emit({ type: "user_text", text });
 
         try {
-          const resposta = await startRun({
-            pergunta: text,
-            perfil: msg.perfil || null,
-            autonoma: Boolean(msg.autonoma),
-            alocacaoUrl: msg.alocacaoUrl || null,
-            workspaceId: msg.workspaceId || null,
-            sessionId,
-            memoryStore,
-            knowledgeStore,
-            baseDir,
-<<<<<<< HEAD
-            llmConfig,
-=======
-            mistralKey,
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
-          });
+          const resposta = await withTimeout(
+            startRun({
+              pergunta: text,
+              perfil: msg.perfil || null,
+              autonoma: Boolean(msg.autonoma),
+              alocacaoUrl: msg.alocacaoUrl || null,
+              workspaceId: msg.workspaceId || null,
+              sessionId,
+              memoryStore,
+              knowledgeStore,
+              baseDir,
+              llmConfig,
+            }),
+            12000,
+            "ws-startRun",
+          );
 
           const runId = resposta.runId || null;
+          await logger?.info?.("ws.user_text.finish", {
+            sessionId,
+            runId,
+            textoPreview: String(resposta.texto || "").slice(0, 160),
+            acoes: Array.isArray(resposta.acoes) ? resposta.acoes.map((item) => item.tipo) : [],
+            pendencias: Array.isArray(resposta.pendencias) ? resposta.pendencias.map((item) => item.label || item.id) : [],
+          });
           emit({ type: "run", runId });
-<<<<<<< HEAD
           emit({ type: "actions", runId, acoes: resposta.acoes || [] });
           if (resposta.pendencias?.length) emit({ type: "pending", runId, pendencias: resposta.pendencias });
 
           await emitTextStream({
             emit: (payload) => emit({ ...payload, runId }),
-=======
-
-          emit({ type: "actions", runId, acoes: resposta.acoes || [] });
-          if (resposta.pendencias?.length) {
-            emit({ type: "pending", runId, pendencias: resposta.pendencias });
-          }
-
-          await emitTextStream({
-            emit: (p) => emit({ ...p, runId }),
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
             runId,
             text: resposta.texto || "",
           });
 
-<<<<<<< HEAD
-=======
-          // Voz feminina única (server TTS). Envia no final para o client tocar.
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
           const audio = await generateTtsBase64(resposta.texto || "");
-          if (audio) emit({ type: "audio", runId, audio });
+          emit({ type: "audio", runId, audio: audio || null, fallbackText: resposta.texto || "" });
         } catch (err) {
+          await logger?.error?.("ws.user_text.error", {
+            sessionId,
+            message: err?.message || String(err),
+            stack: err?.stack || null,
+          });
           emit({ type: "error", error: err?.message || String(err) });
         }
       }
@@ -115,34 +125,42 @@ export function createHttpAndWsServer({
         if (!runId) return;
 
         try {
-          const resposta = await continueRun({
-            runId,
-            approvals: msg.approvals && typeof msg.approvals === "object" ? msg.approvals : {},
-            memoryStore,
-            knowledgeStore,
-          });
+          const resposta = await withTimeout(
+            continueRun({
+              runId,
+              approvals: msg.approvals && typeof msg.approvals === "object" ? msg.approvals : {},
+              memoryStore,
+              knowledgeStore,
+            }),
+            12000,
+            "ws-continueRun",
+          );
 
+          await logger?.info?.("ws.approval.finish", {
+            sessionId,
+            runId,
+            textoPreview: String(resposta.texto || "").slice(0, 160),
+            acoes: Array.isArray(resposta.acoes) ? resposta.acoes.map((item) => item.tipo) : [],
+            pendencias: Array.isArray(resposta.pendencias) ? resposta.pendencias.map((item) => item.label || item.id) : [],
+          });
           emit({ type: "actions", runId, acoes: resposta.acoes || [] });
-<<<<<<< HEAD
           if (resposta.pendencias?.length) emit({ type: "pending", runId, pendencias: resposta.pendencias });
 
           await emitTextStream({
             emit: (payload) => emit({ ...payload, runId }),
-=======
-          if (resposta.pendencias?.length) {
-            emit({ type: "pending", runId, pendencias: resposta.pendencias });
-          }
-
-          await emitTextStream({
-            emit: (p) => emit({ ...p, runId }),
->>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
             runId,
             text: resposta.texto || "",
           });
 
           const audio = await generateTtsBase64(resposta.texto || "");
-          if (audio) emit({ type: "audio", runId, audio });
+          emit({ type: "audio", runId, audio: audio || null, fallbackText: resposta.texto || "" });
         } catch (err) {
+          await logger?.error?.("ws.approval.error", {
+            sessionId,
+            runId,
+            message: err?.message || String(err),
+            stack: err?.stack || null,
+          });
           emit({ type: "error", error: err?.message || String(err) });
         }
       }
