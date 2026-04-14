@@ -7,6 +7,7 @@ import { buildToolsPrompt, CLIENT_ACTIONS, executeServerAction, actionRequiresAp
 import { loadAgencyReference } from "./agencyReference.js";
 import { createWorkspaceStore } from "./workspaceStore.js";
 import { createWorldStateStore } from "./worldStateStore.js";
+import { createMissionStore } from "./missionStore.js";
 
 function getRuns() {
   if (!globalThis.__KIARA_RUNS) globalThis.__KIARA_RUNS = new Map();
@@ -19,6 +20,10 @@ function newId() {
 
 function uniqueGoals(items) {
   return [...new Set((items || []).filter(Boolean))].slice(0, 6);
+}
+
+function inferMissionTitle(question) {
+  return String(question || "").trim().replace(/\s+/g, " ").slice(0, 120) || "Missao da KIARA";
 }
 
 function profilePrompt(perfil) {
@@ -62,7 +67,17 @@ function formatWorldState(worldState) {
     .join("\n\n");
 }
 
-function buildSystemPrompt({ memoria, conversaRecente, conhecimento, worldState, perfil, agencyRef, brainContent, providerName }) {
+function buildSystemPrompt({
+  memoria,
+  conversaRecente,
+  conhecimento,
+  worldState,
+  missions,
+  perfil,
+  agencyRef,
+  brainContent,
+  providerName,
+}) {
   return `
 Voce e KIARA.
 Uma IA autonoma projetada para agir com contexto, iniciativa e conversa natural.
@@ -76,7 +91,7 @@ ${profilePrompt(perfil)}
 ESTILO DE CONVERSA:
 - Converse de forma fluida, natural e inteligente.
 - Mantenha continuidade com o que acabou de ser dito, sem parecer robotica.
-- Se souber algo pelo conhecimento local, pelo estado do mundo do workspace ou pela memoria recente, reutilize antes de depender de busca externa.
+- Se souber algo pelo conhecimento local, pelo estado do mundo do workspace, pelas missoes abertas ou pela memoria recente, reutilize antes de depender de busca externa.
 - Quando fizer pesquisa ou automacao, explique em linguagem humana o que encontrou e o que ainda falta validar.
 
 POLITICA DE SEGURANCA:
@@ -99,6 +114,9 @@ ${memoria || "(vazia)"}
 
 ESTADO DO MUNDO DO WORKSPACE:
 ${worldState || "(vazio)"}
+
+MISSOES ABERTAS:
+${missions || "(nenhuma)"}
 
 NUCLEO DE IDENTIDADE (kiara_brain.md):
 ${brainContent || "(vazio)"}
@@ -194,6 +212,25 @@ async function updateWorldStateFromResults({ worldStateStore, workspaceId, pergu
   }
 }
 
+async function updateMissionStore({ missionStore, workspaceId, question, text, results, pendingLabels = [] }) {
+  if (!missionStore) return;
+  const title = inferMissionTitle(question);
+  const summary = String(text || "").slice(0, 260);
+  const nextStep = pendingLabels.length
+    ? `Aguardar/aprovar: ${pendingLabels.join(" | ")}`
+    : Array.isArray(results) && results.some((item) => item?.ok)
+      ? "Revisar resultado e definir proximo passo"
+      : "Esclarecer ou tentar nova estrategia";
+
+  await missionStore.upsert(workspaceId, {
+    id: title,
+    title,
+    status: pendingLabels.length ? "blocked" : "open",
+    nextStep,
+    summary,
+  });
+}
+
 export async function startRun({
   pergunta,
   perfil,
@@ -209,6 +246,7 @@ export async function startRun({
   const safeBaseDir = baseDir || path.resolve(".");
   const workspaces = createWorkspaceStore({ baseDir: safeBaseDir });
   const worldStateStore = createWorldStateStore({ baseDir: safeBaseDir });
+  const missionStore = createMissionStore({ baseDir: safeBaseDir });
   const wid = workspaces.sanitizeWorkspaceId(workspaceId || sessionId || "default");
   const wsCfg = await workspaces.getWorkspace(wid);
 
@@ -221,6 +259,7 @@ export async function startRun({
   const conversaRecente = memoryStore?.getRecent ? await memoryStore.getRecent(wid, { limit: 8 }) : "";
   const conhecimento = knowledgeStore ? await knowledgeStore.search(wid, pergunta) : "";
   const worldState = await worldStateStore.get(wid);
+  const missionsData = await missionStore.list(wid);
   const agencyRef = await loadAgencyReference({ baseDir: safeBaseDir, perfil, pergunta });
 
   let brainContent = "";
@@ -249,6 +288,7 @@ export async function startRun({
     conversaRecente,
     conhecimento,
     worldState,
+    missionsData,
     agencyRef,
     brainContent,
     toolContext: "",
@@ -257,6 +297,7 @@ export async function startRun({
     pending: [],
     baseDir: safeBaseDir,
     worldStateStore,
+    missionStore,
     createdAt: Date.now(),
   };
 
@@ -266,7 +307,15 @@ export async function startRun({
     currentFocus: state.pergunta,
     activeGoals: uniqueGoals([state.pergunta, ...(state.worldState?.activeGoals || [])]),
   });
+  await state.missionStore.upsert(state.workspaceId, {
+    id: inferMissionTitle(state.pergunta),
+    title: inferMissionTitle(state.pergunta),
+    status: "open",
+    nextStep: "Executar primeira rodada de analise/acoes",
+    summary: state.pergunta,
+  });
   state.worldState = await state.worldStateStore.get(state.workspaceId);
+  state.missionsData = await state.missionStore.list(state.workspaceId);
   return continueRun({ runId, approvals: {}, memoryStore, knowledgeStore });
 }
 
@@ -314,13 +363,21 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
       pergunta: state.pergunta,
       results,
     });
-    state.worldState = await state.worldStateStore.get(state.workspaceId);
     await persistSupervisorLearning({
       knowledgeStore,
       workspaceId: state.workspaceId,
       pergunta: state.pergunta,
       results,
     });
+    await updateMissionStore({
+      missionStore: state.missionStore,
+      workspaceId: state.workspaceId,
+      question: state.pergunta,
+      text: state.lastText,
+      results,
+    });
+    state.worldState = await state.worldStateStore.get(state.workspaceId);
+    state.missionsData = await state.missionStore.list(state.workspaceId);
   }
 
   for (; state.step < state.maxSteps; state.step++) {
@@ -329,6 +386,7 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
       conversaRecente: state.conversaRecente,
       conhecimento: state.conhecimento,
       worldState: formatWorldState(state.worldState),
+      missions: state.missionStore.format(state.missionsData),
       perfil: state.perfil,
       agencyRef: state.agencyRef,
       brainContent: state.brainContent,
@@ -398,6 +456,10 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
         activeGoals: uniqueGoals([state.pergunta, ...(state.worldState?.activeGoals || [])]),
         openLoops: [],
       });
+      await state.missionStore.close(state.workspaceId, inferMissionTitle(state.pergunta), {
+        summary: state.lastText || texto || state.pergunta,
+        nextStep: "Aguardando nova orientacao",
+      });
 
       getRuns().delete(state.runId);
       return { ok: true, runId: state.runId, texto: state.lastText || "Ok.", acoes: state.clientActions };
@@ -432,13 +494,22 @@ export async function continueRun({ runId, approvals, memoryStore, knowledgeStor
       pergunta: state.pergunta,
       results: autoResults,
     });
-    state.worldState = await state.worldStateStore.get(state.workspaceId);
     await persistSupervisorLearning({
       knowledgeStore,
       workspaceId: state.workspaceId,
       pergunta: state.pergunta,
       results: autoResults,
     });
+    await updateMissionStore({
+      missionStore: state.missionStore,
+      workspaceId: state.workspaceId,
+      question: state.pergunta,
+      text: state.lastText,
+      results: autoResults,
+      pendingLabels: pending.map((item) => actionLabel(item)),
+    });
+    state.worldState = await state.worldStateStore.get(state.workspaceId);
+    state.missionsData = await state.missionStore.list(state.workspaceId);
 
     if (pending.length) {
       state.pending = pending.map((action) => ({ id: newId(), action, label: actionLabel(action) }));

@@ -62,6 +62,10 @@ function shouldSearch(lower) {
   return /\b(pesquise|pesquisa|procure|busque|investigue|ache|descubra|levantamento)\b/.test(lower);
 }
 
+function inferMissionIntent(lower) {
+  return /\b(quero|preciso|meta|objetivo|plano|projeto|missao|missão|organize|resolver|fazer)\b/.test(lower);
+}
+
 function buildActionPlan(pergunta, { alocacaoUrl }) {
   const text = String(pergunta || "").trim();
   const lower = text.toLowerCase();
@@ -195,6 +199,10 @@ export async function localChatCompletion({
 
   if (agencyRef) {
     responseParts.push("Os agentes especializados locais reforcam a analise.");
+  }
+
+  if (inferMissionIntent(String(pergunta || "").toLowerCase())) {
+    responseParts.push("Vou tratar isso como uma missao em andamento, nao como uma resposta isolada.");
   }
 
   const quickGuidance = [];
