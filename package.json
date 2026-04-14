@@ -1,0 +1,32 @@
+{
+  "name": "kiara-ai",
+  "version": "1.0.0",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/static": "^6.12.0",
+    "@upstash/redis": "^1.34.0",
+    "dotenv": "^16.6.1",
+    "express": "^4.18.2",
+    "fastify": "^4.29.1",
+    "msedge-tts": "^2.0.4",
+    "node-fetch": "^3.3.2",
+    "ws": "^8.18.3"
+  },
+  "description": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eduardocostag/kiara.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/eduardocostag/kiara/issues"
+  },
+  "homepage": "https://github.com/eduardocostag/kiara#readme"
+}
