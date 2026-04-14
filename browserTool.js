@@ -39,12 +39,17 @@ async function getPlaywright() {
   try {
     return await import("playwright");
   } catch {
+<<<<<<< HEAD
     const err = new Error('Playwright nao instalado (rode "npm i playwright")');
+=======
+    const err = new Error('Playwright não instalado (rode "npm i playwright")');
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     err.code = "KIARA_NO_PLAYWRIGHT";
     throw err;
   }
 }
 
+<<<<<<< HEAD
 async function waitForMaybe(page, selector, timeout = 12000) {
   if (!selector) return;
   await page.waitForSelector(selector, { timeout, state: "visible" });
@@ -190,10 +195,37 @@ export async function runBrowserTask({ baseDir, url, steps = [], objective, head
     return {
       ok: false,
       result: "Dominio nao permitido (defina KIARA_ALLOWED_DOMAINS ou KIARA_ALLOW_ANY_DOMAIN=1)",
+=======
+export async function runBrowserTask({
+  baseDir,
+  url,
+  steps = [],
+  objective,
+  headless = true,
+}) {
+  if (process.env.KIARA_ENABLE_PLAYWRIGHT !== "1") {
+    return {
+      ok: false,
+      result: "Playwright desativado (set KIARA_ENABLE_PLAYWRIGHT=1)",
+    };
+  }
+
+  const targetUrl = String(url || "");
+  if (!isHttpUrl(targetUrl)) return { ok: false, result: "URL inválida" };
+  if (!domainAllowed(targetUrl)) {
+    return {
+      ok: false,
+      result:
+        "Domínio não permitido (defina KIARA_ALLOWED_DOMAINS=ex.com,site.com ou KIARA_ALLOW_ANY_DOMAIN=1)",
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     };
   }
 
   const pw = await getPlaywright();
+<<<<<<< HEAD
+=======
+
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   const runDir = path.join(baseDir, "data", "runs");
   await fs.mkdir(runDir, { recursive: true });
   const runId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -207,6 +239,7 @@ export async function runBrowserTask({ baseDir, url, steps = [], objective, head
   const push = (line) => logs.push(line);
 
   try {
+<<<<<<< HEAD
     push(`OBJETIVO: ${objective || "(nao informado)"}`);
     push(`GOTO: ${targetUrl}`);
     await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
@@ -237,11 +270,59 @@ export async function runBrowserTask({ baseDir, url, steps = [], objective, head
             truncate(bodyText, 9000),
           ].join("\n"),
         };
+=======
+    push(`OBJETIVO: ${objective || "(não informado)"}`);
+    push(`GOTO: ${targetUrl}`);
+    await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 45_000 });
+
+    for (const step of Array.isArray(steps) ? steps : []) {
+      const action = step?.action;
+      if (action === "wait") {
+        const ms = Math.min(Number(step?.ms || 0) || 0, 30_000);
+        push(`WAIT ${ms}ms`);
+        if (ms > 0) await page.waitForTimeout(ms);
+        continue;
+      }
+
+      if (action === "click") {
+        const selector = String(step?.selector || "");
+        push(`CLICK ${selector}`);
+        await page.click(selector, { timeout: 20_000 });
+        continue;
+      }
+
+      if (action === "fill") {
+        const selector = String(step?.selector || "");
+        const text = String(step?.text ?? "");
+        push(`FILL ${selector}`);
+        await page.fill(selector, text, { timeout: 20_000 });
+        continue;
+      }
+
+      if (action === "press") {
+        const selector = String(step?.selector || "");
+        const key = String(step?.key || "Enter");
+        push(`PRESS ${selector} ${key}`);
+        await page.press(selector, key, { timeout: 20_000 });
+        continue;
+      }
+
+      if (action === "extract") {
+        const selector = String(step?.selector || "body");
+        push(`EXTRACT ${selector}`);
+        const text = await page.locator(selector).innerText({ timeout: 20_000 });
+        push(`EXTRACTED_CHARS ${String(text || "").length}`);
+        continue;
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
       }
     }
 
     await page.screenshot({ path: screenshotPath, fullPage: true });
+<<<<<<< HEAD
     const bodyText = await page.locator("body").innerText({ timeout: 20000 });
+=======
+    const bodyText = await page.locator("body").innerText({ timeout: 20_000 });
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
     return {
       ok: true,
@@ -264,3 +345,7 @@ export async function runBrowserTask({ baseDir, url, steps = [], objective, head
     await browser.close().catch(() => {});
   }
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a

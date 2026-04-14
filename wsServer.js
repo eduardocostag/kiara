@@ -20,7 +20,11 @@ export function createHttpAndWsServer({
   memoryStore,
   knowledgeStore,
   baseDir,
+<<<<<<< HEAD
   llmConfig,
+=======
+  mistralKey,
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 }) {
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server, path: "/ws" });
@@ -66,20 +70,39 @@ export function createHttpAndWsServer({
             memoryStore,
             knowledgeStore,
             baseDir,
+<<<<<<< HEAD
             llmConfig,
+=======
+            mistralKey,
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
           });
 
           const runId = resposta.runId || null;
           emit({ type: "run", runId });
+<<<<<<< HEAD
           emit({ type: "actions", runId, acoes: resposta.acoes || [] });
           if (resposta.pendencias?.length) emit({ type: "pending", runId, pendencias: resposta.pendencias });
 
           await emitTextStream({
             emit: (payload) => emit({ ...payload, runId }),
+=======
+
+          emit({ type: "actions", runId, acoes: resposta.acoes || [] });
+          if (resposta.pendencias?.length) {
+            emit({ type: "pending", runId, pendencias: resposta.pendencias });
+          }
+
+          await emitTextStream({
+            emit: (p) => emit({ ...p, runId }),
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
             runId,
             text: resposta.texto || "",
           });
 
+<<<<<<< HEAD
+=======
+          // Voz feminina única (server TTS). Envia no final para o client tocar.
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
           const audio = await generateTtsBase64(resposta.texto || "");
           if (audio) emit({ type: "audio", runId, audio });
         } catch (err) {
@@ -100,10 +123,19 @@ export function createHttpAndWsServer({
           });
 
           emit({ type: "actions", runId, acoes: resposta.acoes || [] });
+<<<<<<< HEAD
           if (resposta.pendencias?.length) emit({ type: "pending", runId, pendencias: resposta.pendencias });
 
           await emitTextStream({
             emit: (payload) => emit({ ...payload, runId }),
+=======
+          if (resposta.pendencias?.length) {
+            emit({ type: "pending", runId, pendencias: resposta.pendencias });
+          }
+
+          await emitTextStream({
+            emit: (p) => emit({ ...p, runId }),
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
             runId,
             text: resposta.texto || "",
           });

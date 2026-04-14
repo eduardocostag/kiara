@@ -10,6 +10,7 @@ import { createKnowledgeStore } from "./knowledgeStore.js";
 import { startRun, continueRun } from "./runManager.js";
 import { putScreenFrame, clearScreen } from "./screenStore.js";
 import { generateTtsBase64 } from "./tts.js";
+<<<<<<< HEAD
 import { buildLlmConfig } from "./llm.js";
 
 dotenv.config();
@@ -17,12 +18,35 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+=======
+
+dotenv.config();
+
+// ──────────────────────────────
+// CONFIG ES MODULES
+// ──────────────────────────────
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// ──────────────────────────────
+// EXPRESS
+// ──────────────────────────────
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 const app = express();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
+<<<<<<< HEAD
 const llmConfig = buildLlmConfig();
+=======
+// ──────────────────────────────
+// CONFIG
+// ──────────────────────────────
+const KEYS = {
+  MISTRAL: process.env.MISTRAL_KEY,
+};
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
 const redis =
   process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
@@ -35,6 +59,12 @@ const redis =
 const memoryStore = createMemoryStore({ redis, baseDir: __dirname });
 const knowledgeStore = createKnowledgeStore({ redis, baseDir: __dirname });
 
+<<<<<<< HEAD
+=======
+// ──────────────────────────────
+// API
+// ──────────────────────────────
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 app.post("/api/chat", async (req, res) => {
   const { pergunta, perfil, autonoma, alocacaoUrl, workspaceId, sessionId, tts } = req.body || {};
 
@@ -53,7 +83,11 @@ app.post("/api/chat", async (req, res) => {
       memoryStore,
       knowledgeStore,
       baseDir: __dirname,
+<<<<<<< HEAD
       llmConfig,
+=======
+      mistralKey: KEYS.MISTRAL,
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     });
 
     const ttsMode = String(tts || "server").toLowerCase();
@@ -102,7 +136,11 @@ app.post("/api/continue", async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.json({
+<<<<<<< HEAD
       texto: "Falha ao continuar a execucao.",
+=======
+      texto: "Falha ao continuar a execução.",
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
       acoes: [],
       runId: null,
       pendencias: [],
@@ -123,7 +161,11 @@ app.post("/api/screen/frame", async (req, res) => {
 
   const img = String(imageBase64Jpeg || "");
   if (!img || img.length > 2_000_000) {
+<<<<<<< HEAD
     return res.status(400).json({ ok: false, error: "Imagem invalida/grande demais" });
+=======
+    return res.status(400).json({ ok: false, error: "Imagem inválida/grande demais" });
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   }
 
   putScreenFrame(sessionId, { imageBase64Jpeg: img, w: Number(w) || null, h: Number(h) || null });
@@ -136,6 +178,12 @@ app.post("/api/screen/stop", async (req, res) => {
   return res.json({ ok: true });
 });
 
+<<<<<<< HEAD
+=======
+// ──────────────────────────────
+// START
+// ──────────────────────────────
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 if (process.env.NODE_ENV !== "production") {
   const useWs = process.env.KIARA_ENABLE_WS === "1";
   if (useWs) {
@@ -145,7 +193,11 @@ if (process.env.NODE_ENV !== "production") {
       memoryStore,
       knowledgeStore,
       baseDir: __dirname,
+<<<<<<< HEAD
       llmConfig,
+=======
+      mistralKey: KEYS.MISTRAL,
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     });
     server.listen(3000, "0.0.0.0", () => {
       console.log("KIARA ONLINE (HTTP + WS + VOZ)");

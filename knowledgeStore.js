@@ -1,7 +1,18 @@
+<<<<<<< HEAD
 import fs from "fs/promises";
 import path from "path";
 import { createLocalJsonlStore } from "./localStore.js";
 import { extractSearchTerms, scoreTextMatch } from "./textSearch.js";
+=======
+import path from "path";
+import { createLocalJsonlStore } from "./localStore.js";
+
+function scoreByKeywords(text, keywords) {
+  if (!text) return 0;
+  const lower = text.toLowerCase();
+  return keywords.reduce((acc, k) => (lower.includes(k) ? acc + 1 : acc), 0);
+}
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
 function sanitizeWorkspaceId(id) {
   const raw = String(id || "").trim().toLowerCase();
@@ -9,6 +20,7 @@ function sanitizeWorkspaceId(id) {
   return cleaned || "default";
 }
 
+<<<<<<< HEAD
 function classifyKnowledge(tags = [], text = "") {
   const bag = `${Array.isArray(tags) ? tags.join(" ") : ""} ${text}`.toLowerCase();
   if (/\b(financ|caixa|margem|lucro|receita|orcamento)\b/.test(bag)) return "finance";
@@ -61,6 +73,9 @@ async function readTextFilesDeep(rootDir) {
 export function createKnowledgeStore({ redis, baseDir }) {
   const globalKnowledgeRoot = path.join(baseDir, "data", "kiara", "knowledge");
 
+=======
+export function createKnowledgeStore({ redis, baseDir }) {
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
   function getLocal(workspaceId) {
     const wid = sanitizeWorkspaceId(workspaceId);
     return createLocalJsonlStore({
@@ -73,6 +88,7 @@ export function createKnowledgeStore({ redis, baseDir }) {
     return `kiara_knowledge:${sanitizeWorkspaceId(workspaceId)}`;
   }
 
+<<<<<<< HEAD
   async function appendStructuredKnowledge(category, title, content, knowledgeType = "nota") {
     const safeCategory = classifyKnowledge([category], `${title}\n${content}`);
     const targetDir = path.join(globalKnowledgeRoot, safeCategory);
@@ -100,6 +116,14 @@ export function createKnowledgeStore({ redis, baseDir }) {
       titulo: title,
       conteudo: content,
       tags: normalizedTags,
+=======
+  async function addNote(workspaceId, { titulo, conteudo, tags = [] }) {
+    const item = {
+      tipo: "nota",
+      titulo: String(titulo || "").slice(0, 200),
+      conteudo: String(conteudo || "").slice(0, 50_000),
+      tags: Array.isArray(tags) ? tags.map(String).slice(0, 20) : [],
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
       time: Date.now(),
     };
 
@@ -108,13 +132,20 @@ export function createKnowledgeStore({ redis, baseDir }) {
         const key = redisKey(workspaceId);
         await redis.lpush(key, JSON.stringify(item));
         await redis.ltrim(key, 0, 799);
+<<<<<<< HEAD
       } catch {
         // fallback local continues
+=======
+        return;
+      } catch {
+        // fallback local
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
       }
     }
 
     const local = getLocal(workspaceId);
     await local.append(item);
+<<<<<<< HEAD
 
     try {
       await appendStructuredKnowledge(
@@ -129,6 +160,13 @@ export function createKnowledgeStore({ redis, baseDir }) {
   }
 
   async function loadWorkspaceItems(workspaceId) {
+=======
+  }
+
+  async function search(workspaceId, query, { limit = 6 } = {}) {
+    const keywords = String(query).toLowerCase().split(/\s+/).filter(Boolean).slice(0, 20);
+
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
     let items = [];
     if (redis) {
       try {
@@ -153,6 +191,7 @@ export function createKnowledgeStore({ redis, baseDir }) {
       items = await local.readAll({ maxLines: 1200 });
     }
 
+<<<<<<< HEAD
     return items;
   }
 
@@ -176,12 +215,26 @@ export function createKnowledgeStore({ redis, baseDir }) {
       .sort((a, b) => b.relevancia - a.relevancia)
       .filter((k) => k.relevancia > 0)
       .slice(0, limit);
+=======
+    const ranked = items
+      .map((k) => ({
+        ...k,
+        relevancia: scoreByKeywords(`${k.titulo} ${k.conteudo} ${(k.tags || []).join(" ")}`, keywords),
+      }))
+      .sort((a, b) => b.relevancia - a.relevancia)
+      .slice(0, limit)
+      .filter((k) => k.relevancia > 0);
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
 
     return ranked
       .map((k) => {
         const tags = Array.isArray(k.tags) && k.tags.length ? `Tags: ${k.tags.join(", ")}` : "";
+<<<<<<< HEAD
         const source = k.path ? `Fonte: ${path.relative(baseDir, k.path).replace(/\\/g, "/")}` : "";
         return [`NOTA: ${k.titulo}`, tags, source, k.conteudo].filter(Boolean).join("\n").trim();
+=======
+        return `NOTA: ${k.titulo}\n${tags}\n${k.conteudo}`.trim();
+>>>>>>> 2e1f73923d7a928f95e67d48f7e466e5a01ba40a
       })
       .join("\n\n");
   }
