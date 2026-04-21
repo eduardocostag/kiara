@@ -6,155 +6,421 @@
   <title>KIARA</title>
   <style>
     :root{
-      --bg:#000;
-      --text:#e8eefc;
-      --muted:rgba(232,238,252,0.68);
-      --panel:rgba(0,0,0,0.40);
-      --border:rgba(0,255,255,0.18);
-      --accent:#18f0ff;
-      --shadow: 0 18px 60px rgba(0,0,0,0.55);
+      --bg:#020508;
+      --bg2:#06131b;
+      --text:#d8f7ff;
+      --muted:rgba(183,235,247,0.68);
+      --panel:rgba(4,17,25,0.42);
+      --panel-strong:rgba(3,14,22,0.62);
+      --border:rgba(113,239,255,0.18);
+      --accent:#63f7ff;
+      --accent-2:#1ed3ff;
+      --accent-soft:rgba(99,247,255,0.15);
+      --ok:#4cffb4;
+      --warn:#f7b955;
+      --err:#ff607e;
+      --shadow:0 24px 80px rgba(0,0,0,0.55);
     }
     *{ box-sizing:border-box; }
     html,body{ height:100%; }
     body{
       margin:0;
-      background: var(--bg);
-      color:var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
       overflow:hidden;
+      color:var(--text);
+      font-family:"Segoe UI Variable Display","Bahnschrift","Segoe UI",system-ui,sans-serif;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(36,172,196,0.18), transparent 30%),
+        radial-gradient(circle at 20% 20%, rgba(25,132,164,0.12), transparent 32%),
+        radial-gradient(circle at 80% 12%, rgba(18,88,120,0.14), transparent 24%),
+        linear-gradient(180deg, #010304 0%, #03111a 48%, #010407 100%);
     }
+    body::before,
+    body::after{
+      content:"";
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      z-index:0;
+    }
+    body::before{
+      background:
+        linear-gradient(rgba(92,217,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(92,217,255,0.05) 1px, transparent 1px);
+      background-size:60px 60px;
+      mask-image:radial-gradient(circle at center, rgba(0,0,0,1), rgba(0,0,0,0.18) 72%, transparent 88%);
+      opacity:.4;
+    }
+    body::after{
+      background:radial-gradient(circle at center, rgba(99,247,255,0.08), transparent 56%);
+      animation:hudPulse 5.8s ease-in-out infinite;
+    }
+    body[data-orb-state="1"]::after{ opacity:.95; }
+    body[data-orb-state="2"]::after{ opacity:1; transform:scale(1.08); }
+    body[data-orb-state="3"]::after{ opacity:1; transform:scale(1.12); }
 
     canvas#canvas{
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 0;
+      position:fixed;
+      inset:0;
+      width:100%;
+      height:100%;
+      z-index:0;
     }
 
     .overlay{
-      position: fixed;
-      inset: 0;
-      z-index: 1;
-      pointer-events: none;
+      position:fixed;
+      inset:0;
+      z-index:1;
+      pointer-events:none;
+      display:grid;
+      grid-template-rows:auto 1fr auto;
+      padding:18px;
     }
 
-    .subtitle{
-      position: absolute;
-      left: 50%;
-      bottom: 110px;
-      transform: translateX(-50%);
-      width: min(920px, calc(100% - 30px));
-      padding: 12px 14px;
-      border-radius: 16px;
-      border: 1px solid var(--border);
-      background: var(--panel);
-      backdrop-filter: blur(10px);
-      box-shadow: var(--shadow);
-      color: var(--text);
-      white-space: pre-wrap;
-      line-height: 1.35;
-      max-height: 26vh;
-      overflow: auto;
-      pointer-events: auto;
+    .statusRow{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      gap:12px;
     }
-    .subtitle.muted{ color: var(--muted); }
+    .statusPill{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width:unset;
+      padding:8px 14px;
+      border-radius:999px;
+      border:1px solid rgba(99,247,255,0.22);
+      background:rgba(3,17,24,0.46);
+      color:var(--text);
+      font-size:11px;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      box-shadow:0 0 24px rgba(49,223,255,0.08);
+      backdrop-filter:blur(10px);
+    }
+    .statusDot{
+      width:9px;
+      height:9px;
+      border-radius:50%;
+      background:rgba(255,255,255,0.45);
+      box-shadow:0 0 0 0 rgba(255,255,255,0.22);
+    }
+    .statusPill.ok .statusDot{ background:var(--ok); box-shadow:0 0 0 7px rgba(76,255,180,0.14); }
+    .statusPill.warn .statusDot{ background:var(--warn); box-shadow:0 0 0 7px rgba(247,185,85,0.14); }
+    .statusPill.off .statusDot{ background:rgba(255,255,255,0.3); box-shadow:none; }
+    .statusPill.err .statusDot{ background:var(--err); box-shadow:0 0 0 7px rgba(255,96,126,0.14); }
+
+    .centerStage{
+      position:relative;
+      align-self:stretch;
+      justify-self:stretch;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:calc(100vh - 140px);
+    }
+    .orbHud{
+      position:absolute;
+      inset:50% auto auto 50%;
+      transform:translate(-50%, -50%);
+      width:min(78vw, 780px);
+      aspect-ratio:1;
+      border-radius:50%;
+      pointer-events:none;
+    }
+    .orbRing,
+    .orbRing::before,
+    .orbRing::after{
+      position:absolute;
+      inset:0;
+      border-radius:50%;
+      content:"";
+    }
+    .orbRing{
+      border:1px solid rgba(99,247,255,0.18);
+      box-shadow:0 0 55px rgba(99,247,255,0.16), inset 0 0 34px rgba(99,247,255,0.1);
+      animation:spinSlow 34s linear infinite;
+    }
+    .orbRing::before{
+      inset:5%;
+      border:1px solid rgba(99,247,255,0.14);
+      box-shadow:inset 0 0 26px rgba(99,247,255,0.08);
+      animation:spinReverse 22s linear infinite;
+    }
+    .orbRing::after{
+      inset:14%;
+      border:1px dashed rgba(99,247,255,0.16);
+      animation:spinSlow 26s linear infinite;
+    }
+    .orbCrosshair{
+      position:absolute;
+      inset:50%;
+      width:82%;
+      height:82%;
+      transform:translate(-50%, -50%) rotate(18deg);
+      border:1px solid rgba(99,247,255,0.1);
+      border-radius:50%;
+      box-shadow:0 0 32px rgba(99,247,255,0.08);
+    }
+    .orbCrosshair::before,
+    .orbCrosshair::after{
+      content:"";
+      position:absolute;
+      left:50%;
+      top:50%;
+      background:linear-gradient(90deg, transparent, rgba(99,247,255,0.5), transparent);
+      transform:translate(-50%, -50%);
+    }
+    .orbCrosshair::before{ width:130%; height:1px; }
+    .orbCrosshair::after{ width:1px; height:130%; background:linear-gradient(180deg, transparent, rgba(99,247,255,0.4), transparent); }
+    .orbCoreLabel{
+      position:absolute;
+      inset:50% auto auto 50%;
+      transform:translate(-50%, -50%);
+      width:min(240px, 54vw);
+      text-align:center;
+      padding:0;
+      border:none;
+      background:none;
+      box-shadow:none;
+      backdrop-filter:none;
+      clip-path:none;
+    }
+    .orbTitle{
+      font-size:0;
+      margin:0;
+      opacity:0;
+      pointer-events:none;
+    }
+    .orbMode{ display:none; }
+    .subtitleWrap{
+      position:absolute;
+      left:50%;
+      bottom:130px;
+      transform:translateX(-50%);
+      width:min(680px, calc(100% - 32px));
+      padding:0;
+      pointer-events:none;
+    }
+    .subtitle{
+      display:none;
+      font-size:16px;
+      line-height:1.55;
+      color:var(--text);
+      text-align:center;
+      text-shadow:0 0 18px rgba(99,247,255,0.14);
+    }
+    .subtitle.muted{ color:var(--muted); }
+
+    .voiceBars{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:4px;
+      height:64px;
+      margin-top:14px;
+    }
+    .voiceBars span{
+      display:inline-block;
+      font-size:clamp(18px, 3.4vw, 34px);
+      font-weight:700;
+      letter-spacing:.08em;
+      color:rgba(218,252,255,0.92);
+      text-shadow:0 0 10px rgba(99,247,255,0.24), 0 0 26px rgba(99,247,255,0.42);
+      animation:lettersIdle 2.4s ease-in-out infinite;
+      animation-delay:calc(var(--i) * 0.08s);
+      transform-origin:center center;
+      opacity:.92;
+    }
+    body[data-orb-state="1"] .voiceBars span{
+      animation-name:lettersListen;
+      opacity:1;
+    }
+    body[data-orb-state="2"] .voiceBars span{
+      animation-name:lettersThink;
+      opacity:1;
+    }
+    body[data-orb-state="3"] .voiceBars span{
+      animation-name:lettersSpeak;
+      opacity:1;
+    }
 
     .actionStrip{
-      position: absolute;
-      left: 50%;
-      bottom: 70px;
-      transform: translateX(-50%);
+      position:absolute;
+      left:50%;
+      bottom:96px;
+      transform:translateX(-50%);
       display:flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      pointer-events: auto;
-      width: min(920px, calc(100% - 30px));
-      justify-content: center;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:center;
+      width:min(760px, calc(100% - 32px));
+      pointer-events:auto;
     }
     .actionStrip.hidden{ display:none; }
     .btn{
-      padding: 8px 10px;
-      border-radius: 12px;
-      border: 1px solid rgba(0,255,255,0.18);
-      background: rgba(0,0,0,0.45);
-      color: var(--text);
+      padding:10px 14px;
+      border-radius:12px;
+      border:1px solid rgba(99,247,255,0.22);
+      background:rgba(3,17,24,0.78);
+      color:var(--text);
       cursor:pointer;
-      font-size: 13px;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(10px);
+      font-size:13px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(10px);
       user-select:none;
     }
-    .btn.ok{ border-color: rgba(34,197,94,0.35); }
-    .btn.no{ border-color: rgba(255,77,109,0.35); }
+    .btn.ok{ border-color:rgba(76,255,180,0.35); }
+    .btn.no{ border-color:rgba(255,96,126,0.35); }
 
+    .chat-controls{
+      position:relative;
+      min-height:112px;
+      pointer-events:none;
+    }
+    .mic,
+    .screenToggle,
+    .send{
+      transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease, background .22s ease;
+    }
+    .mic:hover,
+    .screenToggle:hover,
+    .send:hover{ transform:translateY(-2px); }
     .mic{
       position:absolute;
-      left: 50%;
-      bottom: 18px;
-      transform: translateX(-50%);
-      width: 56px;
-      height: 56px;
-      border-radius: 18px;
-      border: 1px solid rgba(0,255,255,0.22);
-      background: rgba(0,0,0,0.55);
-      color: var(--text);
+      left:50%;
+      bottom:20px;
+      transform:translateX(-50%);
+      width:62px;
+      height:62px;
+      border-radius:18px;
+      border:1px solid rgba(99,247,255,0.24);
+      background:linear-gradient(180deg, rgba(7,33,45,0.88), rgba(1,10,16,0.88));
+      color:var(--text);
       cursor:pointer;
       display:flex;
       align-items:center;
       justify-content:center;
-      font-size: 18px;
-      user-select:none;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(10px);
-      pointer-events: auto;
+      font-size:22px;
+      box-shadow:0 0 26px rgba(99,247,255,0.12);
+      backdrop-filter:blur(12px);
+      pointer-events:auto;
     }
     .mic.on{
-      border-color: rgba(24,240,255,0.55);
-      background: rgba(24,240,255,0.12);
+      border-color:rgba(99,247,255,0.65);
+      background:linear-gradient(180deg, rgba(15,62,74,0.9), rgba(5,24,33,0.9));
+      box-shadow:0 0 32px rgba(99,247,255,0.22);
     }
+    .mic.hidden{ display:none; }
+    .screenToggle{
+      position:absolute;
+      right:0;
+      bottom:20px;
+      min-width:160px;
+      height:48px;
+      border-radius:14px;
+      border:1px solid rgba(99,247,255,0.24);
+      background:linear-gradient(180deg, rgba(7,28,40,0.86), rgba(2,11,17,0.86));
+      color:var(--text);
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:0 16px;
+      font-size:12px;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      box-shadow:0 0 28px rgba(99,247,255,0.12);
+      backdrop-filter:blur(12px);
+      pointer-events:auto;
+    }
+    .screenToggle.on{
+      border-color:rgba(76,255,180,0.42);
+      background:linear-gradient(180deg, rgba(18,58,44,0.9), rgba(5,22,18,0.86));
+    }
+    .toggle-chat{ display:none; }
 
     .typebox{
       position:absolute;
-      left: 50%;
-      bottom: 18px;
-      transform: translateX(-50%);
-      width: min(720px, calc(100% - 30px));
+      left:50%;
+      bottom:16px;
+      transform:translateX(-50%);
+      width:min(760px, calc(100% - 120px));
       display:flex;
-      gap: 10px;
+      gap:12px;
       align-items:flex-end;
-      padding: 10px;
-      border-radius: 18px;
-      border: 1px solid rgba(0,255,255,0.18);
-      background: rgba(0,0,0,0.55);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(12px);
-      pointer-events: auto;
+      padding:12px;
+      border:1px solid rgba(99,247,255,0.22);
+      background:linear-gradient(180deg, rgba(5,18,27,0.82), rgba(2,10,16,0.74));
+      box-shadow:0 0 40px rgba(99,247,255,0.08);
+      backdrop-filter:blur(14px);
+      pointer-events:auto;
+      clip-path:polygon(18px 0, calc(100% - 18px) 0, 100% 18px, 100% calc(100% - 18px), calc(100% - 18px) 100%, 18px 100%, 0 calc(100% - 18px), 0 18px);
     }
-    .typebox.hidden{ display:none; }
+    .typebox.hidden{ display:flex; }
     textarea{
-      flex: 1;
+      flex:1;
       resize:none;
-      min-height: 42px;
-      max-height: 140px;
-      padding: 10px;
-      border-radius: 15px;
-      border: 1px solid var(--border);
-      background: rgba(0,0,0,0.2);
-      color: var(--text);
+      min-height:48px;
+      max-height:140px;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid rgba(99,247,255,0.14);
+      background:rgba(2,11,17,0.64);
+      color:var(--text);
       outline:none;
-      font-size: 14px;
+      font-size:14px;
+      font-family:inherit;
     }
-    textarea::placeholder{ color: rgba(232,238,252,0.45); }
+    textarea::placeholder{ color:rgba(216,247,255,0.45); }
     .send{
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: rgba(24,240,255,0.1);
-      color: var(--text);
+      width:48px;
+      height:48px;
+      border-radius:14px;
+      border:1px solid rgba(99,247,255,0.24);
+      background:linear-gradient(180deg, rgba(16,63,79,0.94), rgba(5,25,33,0.9));
+      color:var(--text);
       cursor:pointer;
-      font-size: 16px;
+      font-size:17px;
+      box-shadow:0 0 24px rgba(99,247,255,0.14);
+    }
+
+    @keyframes spinSlow{ from{ transform:rotate(0deg);} to{ transform:rotate(360deg);} }
+    @keyframes spinReverse{ from{ transform:rotate(360deg);} to{ transform:rotate(0deg);} }
+    @keyframes hudPulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+    @keyframes lettersIdle{
+      0%,100%{ transform:translateY(0) scale(1); opacity:.88; text-shadow:0 0 8px rgba(99,247,255,0.22), 0 0 18px rgba(99,247,255,0.28); }
+      50%{ transform:translateY(-2px) scale(1.02); opacity:1; text-shadow:0 0 12px rgba(99,247,255,0.28), 0 0 28px rgba(99,247,255,0.42); }
+    }
+    @keyframes lettersListen{
+      0%,100%{ transform:translateY(0) scale(1); }
+      30%{ transform:translateY(-6px) scale(1.06); }
+      60%{ transform:translateY(2px) scale(.98); }
+    }
+    @keyframes lettersThink{
+      0%,100%{ transform:scale(1); letter-spacing:.08em; }
+      25%{ transform:scale(1.04); }
+      55%{ transform:scale(.96); letter-spacing:.12em; }
+      75%{ transform:scale(1.06); }
+    }
+    @keyframes lettersSpeak{
+      0%,100%{ transform:translateY(0) scale(1); text-shadow:0 0 14px rgba(99,247,255,0.32), 0 0 28px rgba(99,247,255,0.48); }
+      20%{ transform:translateY(-8px) scale(1.1); text-shadow:0 0 18px rgba(99,247,255,0.42), 0 0 38px rgba(99,247,255,0.6); }
+      45%{ transform:translateY(3px) scale(.98); }
+      70%{ transform:translateY(-4px) scale(1.06); }
+    }
+
+    @media (max-width: 980px){
+      .overlay{
+        padding:12px;
+      }
+      .centerStage{ min-height:calc(100vh - 180px); }
+      .orbHud{ width:min(88vw, 620px); }
+      .subtitleWrap{ bottom:132px; width:min(92vw, 680px); }
+      .typebox{ width:min(94vw, 760px); }
+      .screenToggle{ right:10px; }
     }
   </style>
 </head>
@@ -165,14 +431,39 @@
 
   <div class="overlay">
     <div id="chatSidebar" class="chat-sidebar">
-      <div style="font-weight: bold; color: var(--accent); font-size: 14px; letter-spacing: 1px;">KIARA AI</div>
-      <div id="subtitle" class="subtitle muted">Oi, eu sou a KIARA. Pode falar comigo ou digitar.</div>
-      
+      <div class="statusRow">
+        <div id="screenStatus" class="statusPill off">
+          <span class="statusDot"></span>
+          <span id="screenStatusText">Tela: desligada</span>
+        </div>
+      </div>
+      <div class="centerStage">
+        <div class="orbHud">
+          <div class="orbRing"></div>
+          <div class="orbCrosshair"></div>
+          <div class="orbCoreLabel">
+            <h1 class="orbTitle">KIARA</h1>
+            <div id="orbModeLabel" class="orbMode">Sistema em espera</div>
+            <div id="voiceBars" class="voiceBars" aria-hidden="true">
+              <span style="--i:0">K</span>
+              <span style="--i:1">I</span>
+              <span style="--i:2">A</span>
+              <span style="--i:3">R</span>
+              <span style="--i:4">A</span>
+            </div>
+          </div>
+        </div>
+        <div class="subtitleWrap">
+          <div id="subtitle" class="subtitle muted">Oi, eu sou a KIARA. Pode falar comigo ou digitar.</div>
+        </div>
+      </div>
+
       <div id="actionStrip" class="actionStrip hidden"></div>
 
       <div class="chat-controls">
         <button id="micBtn" class="mic" title="Voz">🎙</button>
-        <div id="typebox" class="typebox hidden">
+        <button id="screenToggleBtn" class="screenToggle" title="Tela">Compartilhar Tela</button>
+        <div id="typebox" class="typebox">
           <textarea id="input" placeholder="Mensagem..."></textarea>
           <button id="sendBtn" class="send">↵</button>
         </div>
@@ -196,10 +487,11 @@
   class Particle {
     constructor() {
       this.angle = Math.random() * Math.PI * 2;
-      this.baseDist = Math.random() * 180; 
+      const spread = Math.random();
+      this.baseDist = spread < 0.45 ? Math.random() * 65 : 70 + Math.random() * 90;
       this.dist = this.baseDist;
       this.size = Math.random() * 1.2 + 0.6; 
-      this.angleSpeed = (Math.random() - 0.5) * 0.02;
+      this.angleSpeed = (Math.random() - 0.5) * 0.012;
       this.phaseX = Math.random() * Math.PI * 2;
       this.phaseY = Math.random() * Math.PI * 2;
       this.offX = 0;
@@ -213,16 +505,16 @@
         speedMult = 1.5;
       } else if (orbState === 2) {
         speedMult = 4;
-        this.dist = this.baseDist * 0.8; 
+        this.dist = this.baseDist * 0.92; 
       } else if (orbState === 3) {
         speedMult = 1.2;
-        this.dist = this.baseDist + (Math.sin(now * 0.02) * 15 * Math.random());
+        this.dist = this.baseDist + (Math.sin(now * 0.01) * 5 * Math.random());
       } else {
         this.dist = this.baseDist;
       }
 
       this.angle += this.angleSpeed * speedMult;
-      const currentR = this.dist + Math.sin(now * 0.002) * 5;
+      const currentR = this.dist + Math.sin(now * 0.0015) * 2.5;
       const baseX = canvas.width / 2 + Math.cos(this.angle) * currentR;
       const baseY = canvas.height / 2 + Math.sin(this.angle) * currentR;
 
@@ -237,8 +529,8 @@
       }
       this.offX *= 0.9; this.offY *= 0.9;
 
-      this.x = baseX + Math.sin(now * 0.001 + this.phaseX) * 20 + this.offX;
-      this.y = baseY + Math.cos(now * 0.0015 + this.phaseY) * 20 + this.offY;
+      this.x = baseX + Math.sin(now * 0.0009 + this.phaseX) * 8 + this.offX;
+      this.y = baseY + Math.cos(now * 0.0011 + this.phaseY) * 8 + this.offY;
     }
 
     draw() {
@@ -250,14 +542,92 @@
     }
   }
 
-  for (let i = 0; i < 250; i++) particles.push(new Particle()); // Mais partículas
+  for (let i = 0; i < 1000; i++) particles.push(new Particle());
 
   let mouse = { x: -1000, y: -1000 };
   window.addEventListener("mousemove", (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
 
   function animate() {
-    ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#020508";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const now = Date.now();
+    const pulse = 1 + Math.sin(now * 0.003) * 0.04;
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const energy =
+      orbState === 1 ? 1.12 :
+      orbState === 2 ? 1.22 :
+      orbState === 3 ? 1.18 :
+      1;
+
+    const outerGlow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 220 * pulse * energy);
+    outerGlow.addColorStop(0, "rgba(24, 240, 255, 0.18)");
+    outerGlow.addColorStop(0.35, "rgba(24, 240, 255, 0.08)");
+    outerGlow.addColorStop(0.7, "rgba(24, 240, 255, 0.02)");
+    outerGlow.addColorStop(1, "rgba(24, 240, 255, 0)");
+    ctx.fillStyle = outerGlow;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 220 * pulse * energy, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(now * 0.0001);
+    for (let i = 0; i < 3; i++) {
+      const radius = (140 + i * 42) * pulse * energy;
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(99,247,255,${0.14 - i * 0.025})`;
+      ctx.lineWidth = i === 0 ? 2 : 1;
+      ctx.arc(0, 0, radius, now * 0.0006 + i, now * 0.0006 + i + Math.PI * 1.35);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(now * 0.00022);
+    ctx.strokeStyle = "rgba(99,247,255,0.16)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 18; i++) {
+      ctx.rotate((Math.PI * 2) / 18);
+      ctx.beginPath();
+      ctx.moveTo(90, 0);
+      ctx.lineTo(180 + Math.sin(now * 0.002 + i) * 16, 0);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(Math.sin(now * 0.0012) * 0.3);
+    ctx.strokeStyle = "rgba(99,247,255,0.18)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-190, -190);
+    ctx.lineTo(190, 190);
+    ctx.moveTo(190, -190);
+    ctx.lineTo(-190, 190);
+    ctx.stroke();
+    ctx.restore();
+
+    const coreGlow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 52 * pulse);
+    coreGlow.addColorStop(0, "rgba(24, 240, 255, 0.9)");
+    coreGlow.addColorStop(0.28, "rgba(24, 240, 255, 0.45)");
+    coreGlow.addColorStop(0.62, "rgba(24, 240, 255, 0.12)");
+    coreGlow.addColorStop(1, "rgba(24, 240, 255, 0)");
+    ctx.fillStyle = coreGlow;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 52 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(220,255,255,0.65)";
+    ctx.lineWidth = 1.4;
+    ctx.arc(centerX, centerY, 16 + Math.sin(now * 0.006) * 2, 0, Math.PI * 2);
+    ctx.stroke();
+
     particles.forEach(p => { p.update(); p.draw(); });
     requestAnimationFrame(animate);
   }
@@ -267,17 +637,21 @@
   // APP
   // ───────────────────────────────────────────────────────────
   const subtitleEl = document.getElementById("subtitle");
+  const screenStatusEl = document.getElementById("screenStatus");
+  const screenStatusTextEl = document.getElementById("screenStatusText");
   const actionStrip = document.getElementById("actionStrip");
   const micBtn = document.getElementById("micBtn");
+  const screenToggleBtn = document.getElementById("screenToggleBtn");
   const typebox = document.getElementById("typebox");
   const input = document.getElementById("input");
   const sendBtn = document.getElementById("sendBtn");
   const chatSidebar = document.getElementById("chatSidebar");
   const toggleChat = document.getElementById("toggleChat");
+  const orbModeLabel = document.getElementById("orbModeLabel");
 
-  toggleChat.addEventListener("click", () => {
-    chatSidebar.classList.toggle("closed");
-  });
+  if (toggleChat) toggleChat.style.display = "none";
+  if (chatSidebar) chatSidebar.classList.remove("closed");
+  if (micBtn) micBtn.classList.add("hidden");
 
   const sessionId = (() => {
     const key = "kiara_session_id";
@@ -303,15 +677,54 @@
   let wsOpenPromise = null;
   let currentRunId = null;
   let voiceOn = false;
+  let voicePrimed = false;
   let listening = false;
   let speaking = false;
   let awaiting = null;
   let assistantBuffer = "";
+  let screenState = "off";
+  let lastScreenAckAt = 0;
+  let lastScreenFrameSentAt = 0;
+  let screenWatchdogTimer = null;
+  const VOICE_RESTART_DELAY_MS = 220;
+  const VOICE_SILENCE_FINALIZE_MS = 680;
+  const VOICE_SILENCE_GUARD_MS = 560;
+  const VOICE_DUPLICATE_GUARD_MS = 1100;
+  const VOICE_RECOGNITION_RESTART_MS = 240;
+
+  function setOrbState(next) {
+    orbState = Number(next || 0) || 0;
+    document.body.dataset.orbState = String(orbState);
+    if (orbModeLabel) orbModeLabel.textContent = "";
+  }
+
+  function updateContextHud() {
+    return;
+  }
 
   function debugClient(event, payload = {}) {
     try {
       console.log("[KIARA_UI]", event, payload);
     } catch {}
+  }
+
+  function canUseVoiceInput() {
+    return Boolean(getSpeechRecognition());
+  }
+
+  function enableVoiceMode() {
+    if (!canUseVoiceInput()) return false;
+    voiceOn = true;
+    voicePrimed = true;
+    updateContextHud();
+    setTimeout(() => startListening(), 80);
+    debugClient("voice.enabled", { primed: true });
+    return true;
+  }
+
+  function primeVoiceMode() {
+    if (voicePrimed || !canUseVoiceInput()) return;
+    enableVoiceMode();
   }
 
   function pickPreferredVoice() {
@@ -338,20 +751,82 @@
     );
   }
 
+  function sanitizeSpeechText(text) {
+    return String(text || "")
+      .replace(/https?:\/\/[^\s]+/gi, "o site")
+      .replace(/\bwww\.[^\s]+/gi, "o site")
+      .replace(/[*_`#>|[\]{}]/g, " ")
+      .replace(/[\u{1F300}-\u{1FAFF}]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   function speakPreferredFallback(text) {
-    const content = String(text || "").trim();
+    const content = sanitizeSpeechText(text);
     if (!content || !("speechSynthesis" in window)) return;
     try {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(content);
       utterance.lang = "pt-BR";
-      utterance.rate = 0.98;
-      utterance.pitch = 1.02;
+      utterance.rate = 1.01;
+      utterance.pitch = 1.01;
+      utterance.onstart = () => {
+        speaking = true;
+        setOrbState(3);
+        stopListening();
+      };
+      utterance.onend = () => {
+        speaking = false;
+        setOrbState(0);
+        updateContextHud();
+        if (voiceOn) setTimeout(() => startListening(), VOICE_RESTART_DELAY_MS);
+      };
+      utterance.onerror = () => {
+        speaking = false;
+        setOrbState(0);
+        updateContextHud();
+        if (voiceOn) setTimeout(() => startListening(), VOICE_RESTART_DELAY_MS);
+      };
       const voice = pickPreferredVoice();
       if (voice) utterance.voice = voice;
       window.speechSynthesis.speak(utterance);
       debugClient("tts.browserFallback", { voice: voice ? voice.name : null });
     } catch {}
+  }
+
+  async function playAssistantAudio(base64, fallbackText = "") {
+    const raw = String(base64 || "").trim();
+    if (!raw) {
+      if (fallbackText) speakPreferredFallback(fallbackText);
+      return false;
+    }
+
+    const candidates = [
+      "data:audio/mpeg;base64," + raw,
+      "data:audio/mp3;base64," + raw,
+      "data:audio/mpeg;charset=utf-8;base64," + raw,
+    ];
+
+    for (const src of candidates) {
+      try {
+        audio.pause();
+      } catch {}
+      try {
+        audio.currentTime = 0;
+      } catch {}
+
+      try {
+        audio.src = src;
+        await audio.play();
+        debugClient("tts.play.ok", { mime: src.slice(5, src.indexOf(";")) });
+        return true;
+      } catch (err) {
+        debugClient("tts.play.fail", { message: String(err?.message || err) });
+      }
+    }
+
+    if (fallbackText) speakPreferredFallback(fallbackText);
+    return false;
   }
 
   // Screen share (somente por comando)
@@ -366,6 +841,49 @@
   function setSubtitle(text, muted=false){
     subtitleEl.textContent = text || "";
     subtitleEl.classList.toggle("muted", Boolean(muted));
+    subtitleEl.style.display = text ? "block" : "none";
+  }
+
+  function setScreenStatus(state, text){
+    screenState = state;
+    screenStatusEl.classList.remove("off", "ok", "warn", "err");
+    screenStatusEl.classList.add(state);
+    screenStatusTextEl.textContent = text;
+    if (screenToggleBtn) {
+      const isOn = state === "ok" || state === "warn";
+      screenToggleBtn.classList.toggle("on", isOn);
+      screenToggleBtn.textContent = isOn ? "Parar Tela" : "Compartilhar Tela";
+    }
+  }
+
+  function startScreenWatchdog(){
+    if (screenWatchdogTimer) return;
+    screenWatchdogTimer = setInterval(() => {
+      if (!screenStream) {
+        setScreenStatus("off", "Tela: desligada");
+        return;
+      }
+
+      const now = Date.now();
+      if (lastScreenAckAt && now - lastScreenAckAt <= 3000) {
+        setScreenStatus("ok", "Tela: recebendo em tempo real");
+        return;
+      }
+
+      if (lastScreenFrameSentAt && now - lastScreenFrameSentAt <= 4000) {
+        setScreenStatus("warn", "Tela: compartilhando, aguardando sinal");
+        return;
+      }
+
+      setScreenStatus("err", "Tela: sem sinal da Kiara");
+    }, 700);
+  }
+
+  function stopScreenWatchdog(){
+    if (screenWatchdogTimer) {
+      clearInterval(screenWatchdogTimer);
+      screenWatchdogTimer = null;
+    }
   }
 
   function hideActions(){
@@ -389,16 +907,34 @@
 
   const audio = new Audio();
   audio.autoplay = true;
-  audio.onplay = () => { speaking = true; orbState = 3; };
-  audio.onended = () => { speaking = false; orbState = 0; if (voiceOn) startListening(); };
-  audio.onerror = () => { speaking = false; orbState = 0; if (voiceOn) startListening(); };
+  audio.preload = "auto";
+  audio.onplay = () => {
+    speaking = true;
+    setOrbState(3);
+    updateContextHud();
+    stopListening();
+  };
+  audio.onended = () => {
+    speaking = false;
+    setOrbState(0);
+    updateContextHud();
+    if (voiceOn) setTimeout(() => startListening(), VOICE_RESTART_DELAY_MS);
+  };
+  audio.onerror = () => {
+    speaking = false;
+    setOrbState(0);
+    updateContextHud();
+    if (voiceOn) setTimeout(() => startListening(), VOICE_RESTART_DELAY_MS);
+  };
 
   function stopAll(){
     try { audio.pause(); } catch {}
     try { audio.currentTime = 0; } catch {}
+    try { window.speechSynthesis.cancel(); } catch {}
     speaking = false;
     awaiting = null;
-    orbState = 0;
+    setOrbState(0);
+    updateContextHud();
     hideActions();
     setSubtitle("pronta", true);
   }
@@ -501,7 +1037,7 @@
       if (msg.type === "run") {
         currentRunId = msg.runId || null;
         assistantBuffer = "";
-        orbState = 2;
+        setOrbState(2);
         hideActions();
         setSubtitle("pensando...", true);
         return;
@@ -518,27 +1054,24 @@
 
       if (msg.type === "audio") {
         if (msg.audio) {
-          try {
-            audio.src = "data:audio/mp3;base64," + msg.audio;
-            await audio.play();
-          } catch {
-            if (assistantBuffer) {
-              setSubtitle(assistantBuffer, false);
-              orbState = 0;
-              speakPreferredFallback(msg.fallbackText || assistantBuffer);
-            }
-          }
+        await playAssistantAudio(msg.audio, msg.fallbackText || assistantBuffer);
         } else if (assistantBuffer) {
           setSubtitle(assistantBuffer, false);
-          orbState = 0;
+          setOrbState(0);
           speakPreferredFallback(msg.fallbackText || assistantBuffer);
         }
         return;
       }
 
+      if (msg.type === "screen_ack") {
+        lastScreenAckAt = Date.now();
+        setScreenStatus("ok", "Tela: recebendo em tempo real");
+        return;
+      }
+
       if (msg.type === "error") {
         setSubtitle(`Erro: ${String(msg.error || "falha desconhecida")}`, false);
-        orbState = 0;
+        setOrbState(0);
         return;
       }
 
@@ -583,6 +1116,8 @@
     const t = String(text || "").trim();
     if (!t) return;
 
+    if (!voicePrimed) primeVoiceMode();
+    if (speaking) stopAll();
     if (tryHandleLocalCommands(t)) return;
 
     debugClient("sendText.begin", {
@@ -593,7 +1128,7 @@
     });
 
     const wsConnectPromise = connectWs();
-    orbState = 2;
+    setOrbState(2);
     hideActions();
     setSubtitle("pensando...", true);
 
@@ -629,7 +1164,7 @@
           sessionId,
           autonoma: true,
           perfil: currentProfile || null,
-          tts: "none",
+          tts: "server",
           workspaceId: currentWorkspaceId,
           alocacaoUrl: currentAllocUrl || null,
         }),
@@ -642,16 +1177,18 @@
         acoes: Array.isArray(data.acoes) ? data.acoes.map((item) => item.tipo) : [],
         pendencias: Array.isArray(data.pendencias) ? data.pendencias.length : 0,
       });
-      assistantBuffer = String(data.texto || "").trim();
+      assistantBuffer = String(data.fala || data.texto || "").trim();
       if (assistantBuffer) {
         setSubtitle(assistantBuffer, false);
-        orbState = 0;
+        setOrbState(0);
       } else {
         setSubtitle("Nao consegui obter resposta agora.", false);
-        orbState = 0;
+        setOrbState(0);
       }
       if (data.audio) {
-        try { audio.src = "data:audio/mp3;base64," + data.audio; await audio.play(); } catch {}
+        await playAssistantAudio(data.audio, assistantBuffer);
+      } else if (assistantBuffer) {
+        speakPreferredFallback(assistantBuffer);
       }
       if (data.acoes && data.acoes.length) {
         const clientOpen = data.acoes.filter(a => ["abrir_site","pesquisa","youtube_busca"].includes(a.tipo));
@@ -660,7 +1197,7 @@
     } catch (err) {
       debugClient("sendText.viaHttp.error", { message: String(err?.message || err) });
       setSubtitle("A resposta demorou demais ou falhou. Tente novamente.", false);
-      orbState = 0;
+      setOrbState(0);
     }
   }
 
@@ -671,10 +1208,15 @@
       screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
     } catch {
       setSubtitle("Não consegui iniciar o compartilhamento de tela. Verifique permissões do navegador.", false);
+      setScreenStatus("err", "Tela: permissao negada");
       return;
     }
 
     setSubtitle("Ok. Estou recebendo sua tela. Pergunte: 'o que você está vendo?'", false);
+    lastScreenAckAt = 0;
+    lastScreenFrameSentAt = 0;
+    setScreenStatus("warn", "Tela: compartilhando, aguardando sinal");
+    startScreenWatchdog();
     screenVideo.srcObject = screenStream;
     await screenVideo.play();
 
@@ -696,6 +1238,7 @@
 
         const dataUrl = canvas2.toDataURL("image/jpeg", 0.6);
         const base64 = dataUrl.split(",")[1];
+        lastScreenFrameSentAt = Date.now();
 
         if (wsReady) {
           ws.send(JSON.stringify({ type: "screen_frame", imageBase64Jpeg: base64, w: targetW, h: targetH }));
@@ -708,9 +1251,15 @@
           if (res.status === 403) {
             await stopScreenShare();
             setSubtitle("Tela está desativada no servidor. Ative com KIARA_ENABLE_SCREEN=1.", false);
+            setScreenStatus("err", "Tela: desativada no servidor");
+          } else if (res.ok) {
+            lastScreenAckAt = Date.now();
+            setScreenStatus("ok", "Tela: recebendo em tempo real");
           }
         }
-      } catch {}
+      } catch {
+        setScreenStatus("err", "Tela: falha ao enviar frame");
+      }
     }, 1100);
 
     const track = screenStream.getVideoTracks()[0];
@@ -720,6 +1269,10 @@
   async function stopScreenShare(){
     if (screenTimer) { clearInterval(screenTimer); screenTimer = null; }
     if (screenStream) { for (const t of screenStream.getTracks()) t.stop(); screenStream = null; }
+    stopScreenWatchdog();
+    lastScreenAckAt = 0;
+    lastScreenFrameSentAt = 0;
+    setScreenStatus("off", "Tela: desligada");
     try {
       await fetch("/api/screen/stop", {
         method: "POST",
@@ -745,14 +1298,14 @@
   function scheduleSilenceFinalize(){
     if (!voiceOn) return;
     if (silenceTimer) clearTimeout(silenceTimer);
-    silenceTimer = setTimeout(()=>tryFinalizeInterimBySilence(), 900);
+    silenceTimer = setTimeout(()=>tryFinalizeInterimBySilence(), VOICE_SILENCE_FINALIZE_MS);
   }
 
   function tryFinalizeInterimBySilence(){
     if (!voiceOn) return;
     const now = Date.now();
     if (!interimCache) return;
-    if (now - interimLastAt < 750) return;
+    if (now - interimLastAt < VOICE_SILENCE_GUARD_MS) return;
     const candidate = interimCache.trim();
     interimCache = "";
 
@@ -760,7 +1313,7 @@
     if (!normalized || normalized.length < 3) return;
     if (normalized === lastAutoSent) return;
     lastAutoSent = normalized;
-    if (now - lastHeardAt < 500) return;
+    if (now - lastHeardAt < VOICE_SILENCE_GUARD_MS) return;
     handleUtterance(candidate);
   }
 
@@ -779,11 +1332,25 @@
     }
 
     // comando de tela (sem botão)
-    if (lower.includes("ver minha tela") || lower.includes("compartilhar tela") || lower.includes("mostrar tela")) {
+    if (
+      lower.includes("ver minha tela") ||
+      lower.includes("compartilhar tela") ||
+      lower.includes("compartilhar a tela") ||
+      lower.includes("mostrar tela") ||
+      lower.includes("mostrar minha tela") ||
+      lower.includes("iniciar compartilhamento") ||
+      lower.includes("ativar compartilhamento") ||
+      lower.includes("ativar tela")
+    ) {
       await startScreenShare();
       return;
     }
-    if (lower.includes("parar tela") || lower.includes("fechar tela")) {
+    if (
+      lower.includes("parar tela") ||
+      lower.includes("fechar tela") ||
+      lower.includes("parar compartilhamento") ||
+      lower.includes("desativar tela")
+    ) {
       await stopScreenShare();
       setSubtitle("Ok. Parei de receber sua tela.", false);
       return;
@@ -836,6 +1403,7 @@
         currentProfile = aliases[requested];
         if (currentProfile) localStorage.setItem(profileKey, currentProfile);
         else localStorage.removeItem(profileKey);
+        updateContextHud();
         setSubtitle(`Ok. Perfil atual: ${currentProfile || "(nenhum)"}`, true);
         return true;
       }
@@ -847,6 +1415,7 @@
       const next = m1[2].trim();
       currentWorkspaceId = next;
       localStorage.setItem(currentWorkspaceIdKey, currentWorkspaceId);
+      updateContextHud();
       setSubtitle(`Ok. Workspace atual: ${currentWorkspaceId}`, true);
       return true;
     }
@@ -856,6 +1425,7 @@
     if (m2) {
       currentAllocUrl = m2[2].trim();
       localStorage.setItem(allocKey, currentAllocUrl);
+      updateContextHud();
       setSubtitle(`Ok. Site alocado: ${currentAllocUrl}`, true);
       return true;
     }
@@ -875,12 +1445,26 @@
       return true;
     }
 
+    if (lower === "rotinas aprendidas" || lower === "acoes aprendidas" || lower === "ações aprendidas") {
+      fetch(`/api/workspace/${encodeURIComponent(currentWorkspaceId)}/learned-actions`)
+        .then((res) => res.json())
+        .then((data) => {
+          const summary = String(data?.summary || "Nenhum aprendizado encontrado.").trim();
+          setSubtitle(summary, false);
+        })
+        .catch(() => {
+          setSubtitle("Nao consegui carregar as rotinas aprendidas agora.", false);
+        });
+      return true;
+    }
+
     return false;
   }
 
   function startListening(){
     if (!voiceOn) return;
     const SR = getSpeechRecognition();
+    if (speaking || listening) return;
     if (!SR) { setSubtitle("Seu navegador não suporta reconhecimento de voz.", true); return; }
 
     connectWs();
@@ -893,12 +1477,13 @@
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
 
-      recognition.onstart = () => { listening = true; orbState = 1; };
-      recognition.onerror = () => { listening = false; orbState = 0; setSubtitle("erro no microfone", true); };
+      recognition.onstart = () => { listening = true; setOrbState(1); updateContextHud(); };
+      recognition.onerror = () => { listening = false; setOrbState(0); updateContextHud(); setSubtitle("erro no microfone", true); };
       recognition.onend = () => {
         listening = false;
+        updateContextHud();
         if (voiceOn && !suspendAutoRestart) {
-          setTimeout(()=>{ try { recognition.start(); } catch {} }, 350);
+          setTimeout(()=>{ try { recognition.start(); } catch {} }, VOICE_RECOGNITION_RESTART_MS);
         }
       };
 
@@ -922,7 +1507,7 @@
         const cleanFinal = (finalText || "").trim();
         if (cleanFinal) {
           const now = Date.now();
-          if (now - lastHeardAt < 800 && cleanFinal === lastFinal) return;
+          if (now - lastHeardAt < VOICE_DUPLICATE_GUARD_MS && cleanFinal === lastFinal) return;
           lastHeardAt = now;
           lastFinal = cleanFinal;
           handleUtterance(cleanFinal);
@@ -930,7 +1515,11 @@
       };
     }
 
-    try { recognition.start(); } catch {}
+    try {
+      recognition.start();
+    } catch (err) {
+      debugClient("voice.start.fail", { message: String(err?.message || err) });
+    }
   }
 
   function stopListening(){
@@ -938,7 +1527,8 @@
     suspendAutoRestart = true;
     try { recognition.stop(); } catch {}
     listening = false;
-    orbState = 0;
+    setOrbState(0);
+    updateContextHud();
   }
 
   // UI
@@ -947,21 +1537,16 @@
     setTimeout(()=>input.focus(), 50);
   }
   function closeTypebox(){
-    typebox.classList.add("hidden");
+    typebox.classList.remove("hidden");
+    input.blur();
   }
 
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey && typebox.classList.contains("hidden")) {
-      e.preventDefault();
-      openTypebox();
-    }
-    if (e.key === "Escape" && !typebox.classList.contains("hidden")) {
+    if (e.key === "Escape") {
       e.preventDefault();
       closeTypebox();
     }
   });
-
-  subtitleEl.addEventListener("click", () => openTypebox());
 
   sendBtn.addEventListener("click", async () => {
     const t = input.value.trim();
@@ -982,19 +1567,27 @@
     }
   });
 
-  micBtn.addEventListener("click", () => {
-    voiceOn = !voiceOn;
-    micBtn.classList.toggle("on", voiceOn);
-    if (voiceOn) {
-      setSubtitle("ouvindo...", true);
-      startListening();
-    } else {
-      stopListening();
-      setSubtitle("pronta", true);
-    }
-  });
+  openTypebox();
+
+  if (screenToggleBtn) {
+    screenToggleBtn.addEventListener("click", async () => {
+      if (screenStream) {
+        await stopScreenShare();
+        setSubtitle("Ok. Parei de receber sua tela.", false);
+      } else {
+        await startScreenShare();
+      }
+    });
+  }
+
+  window.addEventListener("pointerdown", primeVoiceMode, { once: true });
+  window.addEventListener("keydown", primeVoiceMode, { once: true });
+  input.addEventListener("focus", primeVoiceMode, { once: true });
 
   setSubtitle("Oi, eu sou a KIARA. Pode falar comigo ou digitar.", true);
+  setScreenStatus("off", "Tela: desligada");
+  setOrbState(0);
+  updateContextHud();
 </script>
 </body>
 </html>

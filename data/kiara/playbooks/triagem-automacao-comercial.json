@@ -1,0 +1,27 @@
+{
+  "nome": "Triagem e Automacao Comercial",
+  "objetivo": "Estruturar um fluxo automatizado de entrada, qualificacao inicial, registro e encaminhamento comercial.",
+  "url": "",
+  "tags": ["automacao", "vendas", "marketing", "workflow", "crm"],
+  "passos": [
+    "Definir gatilho de entrada do lead e campos obrigatorios.",
+    "Validar origem, contato e nivel minimo de aderencia ao ICP.",
+    "Aplicar regra de decisao para classificar lead quente, morno ou frio.",
+    "Registrar a passagem no sistema ou playbook com log e status.",
+    "Disparar proximo passo adequado: follow-up, proposta, nutricao ou descarte."
+  ],
+  "checkpoints": [
+    "Gatilho claro",
+    "Campos minimos validados",
+    "Classificacao objetiva",
+    "Log da automacao disponivel",
+    "Fallback para excecao definido"
+  ],
+  "successCriteria": [
+    "Menos lead perdido",
+    "Menos triagem manual",
+    "Resposta comercial mais consistente"
+  ],
+  "createdAt": "2026-04-20T00:00:00.000Z",
+  "updatedAt": "2026-04-20T00:00:00.000Z"
+}

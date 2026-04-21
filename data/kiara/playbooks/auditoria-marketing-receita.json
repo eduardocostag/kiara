@@ -1,0 +1,27 @@
+{
+  "nome": "Auditoria de Marketing e Receita",
+  "objetivo": "Diagnosticar gargalos de marketing conectando oferta, pagina, campanha, vendas e monetizacao.",
+  "url": "",
+  "tags": ["marketing", "vendas", "financas", "auditoria", "receita"],
+  "passos": [
+    "Entender meta principal: lead, venda, ticket, margem ou recompra.",
+    "Revisar oferta, promessa, publico, pagina e CTA.",
+    "Mapear gargalo dominante entre trafego, clique, captura, qualificacao e fechamento.",
+    "Cruzar metricas de marketing com taxa comercial e impacto financeiro.",
+    "Priorizar quick wins com hipotese, metrica e prazo."
+  ],
+  "checkpoints": [
+    "Oferta e promessa coerentes",
+    "Pagina com CTA claro",
+    "Marketing conectado ao processo comercial",
+    "Metricas de receita identificadas",
+    "Backlog priorizado"
+  ],
+  "successCriteria": [
+    "Gargalo dominante identificado",
+    "Plano curto de melhoria definido",
+    "Acao ligada a metrica e impacto"
+  ],
+  "createdAt": "2026-04-20T00:00:00.000Z",
+  "updatedAt": "2026-04-20T00:00:00.000Z"
+}

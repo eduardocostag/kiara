@@ -1,0 +1,16 @@
+{
+  "nome": "zabbix-fila-alta",
+  "objetivo": "Investigar fila alta no Zabbix com foco em gargalo real de coleta, pollers, proxies, banco ou itens problemáticos.",
+  "url": "",
+  "tags": ["infraestrutura", "zabbix", "observabilidade", "queue", "performance"],
+  "passos": [
+    "Definir se a fila alta e geral ou concentrada em alguns hosts, itens ou proxies.",
+    "Validar pollers, unreachable pollers, preprocessors, history syncers e busy percentages.",
+    "Checar itens lentos, itens unsupported, timeouts e dependencias externas que travam coleta.",
+    "Separar gargalo de proxy, rede, banco de dados ou tuning do server.",
+    "Verificar backlog por tipo de item e por freshness antes de alterar tuning.",
+    "Fechar com ajuste minimo e metrica de validacao da reducao da fila."
+  ],
+  "createdAt": "2026-04-21T00:00:00.000Z",
+  "updatedAt": "2026-04-21T00:00:00.000Z"
+}

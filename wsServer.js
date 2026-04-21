@@ -86,7 +86,7 @@ export function createHttpAndWsServer({
               baseDir,
               llmConfig,
             }),
-            12000,
+            20000,
             "ws-startRun",
           );
 
@@ -102,14 +102,16 @@ export function createHttpAndWsServer({
           emit({ type: "actions", runId, acoes: resposta.acoes || [] });
           if (resposta.pendencias?.length) emit({ type: "pending", runId, pendencias: resposta.pendencias });
 
-          await emitTextStream({
-            emit: (payload) => emit({ ...payload, runId }),
-            runId,
-            text: resposta.texto || "",
-          });
-
-          const audio = await generateTtsBase64(resposta.texto || "");
-          emit({ type: "audio", runId, audio: audio || null, fallbackText: resposta.texto || "" });
+          const spoken = resposta.fala || resposta.texto || "";
+          const [audio] = await Promise.all([
+            generateTtsBase64(spoken),
+            emitTextStream({
+              emit: (payload) => emit({ ...payload, runId }),
+              runId,
+              text: resposta.texto || "",
+            }),
+          ]);
+          emit({ type: "audio", runId, audio: audio || null, fallbackText: spoken });
         } catch (err) {
           await logger?.error?.("ws.user_text.error", {
             sessionId,
@@ -132,7 +134,7 @@ export function createHttpAndWsServer({
               memoryStore,
               knowledgeStore,
             }),
-            12000,
+            20000,
             "ws-continueRun",
           );
 
@@ -146,14 +148,16 @@ export function createHttpAndWsServer({
           emit({ type: "actions", runId, acoes: resposta.acoes || [] });
           if (resposta.pendencias?.length) emit({ type: "pending", runId, pendencias: resposta.pendencias });
 
-          await emitTextStream({
-            emit: (payload) => emit({ ...payload, runId }),
-            runId,
-            text: resposta.texto || "",
-          });
-
-          const audio = await generateTtsBase64(resposta.texto || "");
-          emit({ type: "audio", runId, audio: audio || null, fallbackText: resposta.texto || "" });
+          const spoken = resposta.fala || resposta.texto || "";
+          const [audio] = await Promise.all([
+            generateTtsBase64(spoken),
+            emitTextStream({
+              emit: (payload) => emit({ ...payload, runId }),
+              runId,
+              text: resposta.texto || "",
+            }),
+          ]);
+          emit({ type: "audio", runId, audio: audio || null, fallbackText: spoken });
         } catch (err) {
           await logger?.error?.("ws.approval.error", {
             sessionId,

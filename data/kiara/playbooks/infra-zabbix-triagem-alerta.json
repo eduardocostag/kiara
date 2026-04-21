@@ -1,0 +1,16 @@
+{
+  "nome": "triagem-zabbix-alerta",
+  "objetivo": "Triar alertas e problemas no Zabbix de forma senior, reduzindo chute e indo de evidencia para causa raiz.",
+  "url": "",
+  "tags": ["infraestrutura", "zabbix", "linux", "observabilidade", "troubleshooting"],
+  "passos": [
+    "Identificar host, trigger, severidade, janela de tempo e impacto real do alerta.",
+    "Validar se o item associado esta coletando e se o ultimo valor faz sentido.",
+    "Verificar template, trigger expression, dependencias, maintenance e ruido de configuracao.",
+    "Checar fila, pollers, proxies, cache e itens unsupported se houver sinal de atraso sistemico.",
+    "Separar causa em monitoramento, conectividade, recurso do host, servico da aplicacao ou ruido de threshold.",
+    "Propor comando objetivo de verificacao e validacao final apos a correcao."
+  ],
+  "createdAt": "2026-04-21T00:00:00.000Z",
+  "updatedAt": "2026-04-21T00:00:00.000Z"
+}

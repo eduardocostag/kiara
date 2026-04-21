@@ -25,6 +25,7 @@ async function writeJson(filePath, data) {
 export function createWorkspaceStore({ baseDir }) {
   const root = path.join(baseDir, "data", "workspaces");
   const indexPath = path.join(root, "index.json");
+  const globalPlaybooksRoot = path.join(baseDir, "data", "kiara", "playbooks");
 
   async function ensureWorkspace(workspaceId) {
     const id = sanitizeWorkspaceId(workspaceId);
@@ -70,6 +71,91 @@ export function createWorkspaceStore({ baseDir }) {
     return Object.keys(idx.workspaces || {}).sort();
   }
 
-  return { sanitizeWorkspaceId, getWorkspace, setWorkspace, listWorkspaces, root };
-}
+  function automationDir(workspaceId) {
+    return path.join(root, sanitizeWorkspaceId(workspaceId), "automations");
+  }
 
+  async function readAutomationCollection(dir, source) {
+    let entries = [];
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+
+    const automations = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".json")) continue;
+      const filePath = path.join(dir, entry.name);
+      const item = await readJson(filePath, null);
+      if (!item || typeof item !== "object") continue;
+      automations.push({
+        ...item,
+        slug: path.basename(entry.name, ".json"),
+        filePath,
+        source,
+      });
+    }
+
+    return automations;
+  }
+
+  async function listAutomations(workspaceId) {
+    const [workspaceAutomations, globalPlaybooks] = await Promise.all([
+      readAutomationCollection(automationDir(workspaceId), "workspace"),
+      readAutomationCollection(globalPlaybooksRoot, "global"),
+    ]);
+
+    return [...workspaceAutomations, ...globalPlaybooks].sort((a, b) => {
+      const scoreA = a.source === "workspace" ? 1 : 0;
+      const scoreB = b.source === "workspace" ? 1 : 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      const aTime = Date.parse(a.updatedAt || a.createdAt || 0) || 0;
+      const bTime = Date.parse(b.updatedAt || b.createdAt || 0) || 0;
+      return bTime - aTime;
+    });
+  }
+
+  async function getRelevantAutomations(workspaceId, query, { limit = 4 } = {}) {
+    const automations = await listAutomations(workspaceId);
+    const terms = String(query || "")
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^\w\s-]/g, " ")
+      .split(/\s+/)
+      .filter((item) => item && item.length >= 3);
+
+    const scored = automations
+      .map((item) => {
+        const haystack = [
+          item.slug,
+          item.nome,
+          item.objetivo,
+          item.url,
+          Array.isArray(item.passos) ? item.passos.join(" ") : "",
+          Array.isArray(item.tags) ? item.tags.join(" ") : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        const score = terms.reduce((acc, term) => acc + (haystack.includes(term) ? 1 : 0), 0);
+        return { ...item, score };
+      })
+      .filter((item) => item.score > 0 || !terms.length)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    return scored;
+  }
+
+  return {
+    sanitizeWorkspaceId,
+    getWorkspace,
+    setWorkspace,
+    listWorkspaces,
+    listAutomations,
+    getRelevantAutomations,
+    root,
+  };
+}

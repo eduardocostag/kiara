@@ -6,8 +6,8 @@ import fetch from "node-fetch";
 import { duckDuckGoSearch } from "./webSearch.js";
 import { deepWebResearch } from "./webResearch.js";
 import { runBrowserTask } from "./browserTool.js";
-import { getScreenFrame } from "./screenStore.js";
-import { analyzeImage } from "./vision.js";
+import { getScreenFrame, getScreenFrameSummary, getScreenAnalysisContext, rememberScreenObservation, rememberScreenAnalysis, findScreenAnalysis, updateScreenLiveSummary, getScreenLiveSummary } from "./screenStore.js";
+import { analyzeImage, analyzeImageStructured } from "./vision.js";
 import { auditSite } from "./siteAudit.js";
 import { leadSearch } from "./leadSearch.js";
 import { buildLandingPageHtml } from "./landingPage.js";
@@ -46,12 +46,102 @@ function extractTextFromHtml(html) {
     .trim();
 }
 
+function inferAutomationTags(text) {
+  const lower = String(text || "").toLowerCase();
+  const tags = [];
+  if (/\b(marketing|copy|seo|trafego|instagram|anuncio)\b/.test(lower)) tags.push("marketing");
+  if (/\b(vendas|lead|proposta|fechamento|oferta)\b/.test(lower)) tags.push("vendas");
+  if (/\b(financ|caixa|margem|receita|lucro)\b/.test(lower)) tags.push("financas");
+  if (/\b(gestao|processo|operacao|backlog|prioridade)\b/.test(lower)) tags.push("gestao");
+  if (/\b(api|automacao|agente|integra|backend|frontend|site|codigo)\b/.test(lower)) tags.push("tecnologia");
+  if (/\b(linux|docker|container|compose|nginx|systemd|servidor|infra)\b/.test(lower)) tags.push("infraestrutura");
+  return [...new Set(tags)];
+}
+
+function formatDuration(ms) {
+  const seconds = Math.max(0, Math.round(Number(ms || 0) / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return rest ? `${minutes}m${rest}s` : `${minutes}m`;
+}
+
+function summarizeVisualPattern(text) {
+  return String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 6)
+    .join("\n")
+    .slice(0, 900);
+}
+
+function normalizeShortList(items, max = 8) {
+  return [...new Set((Array.isArray(items) ? items : []).map((item) => String(item || "").trim()).filter(Boolean))].slice(0, max);
+}
+
+function extractVisualSignals(text) {
+  const source = String(text || "");
+  const lines = source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const currentFocus = lines[0] || "";
+  const currentApp =
+    lines.find((line) => /\b(chrome|edge|firefox|github|youtube|google|obsidian|vscode|visual studio code|terminal|explorer|windows)\b/i.test(line)) || "";
+
+  const recentInsights = lines.slice(0, 4).map((line) => line.replace(/^[-*]\s*/, ""));
+  const recentChanges = lines
+    .filter((line) => /\b(erro|falha|carregando|loading|aberto|aberta|selecionado|selecionada|botao|clique|campo|modal|janela)\b/i.test(line))
+    .slice(0, 3)
+    .map((line) => line.replace(/^[-*]\s*/, ""));
+
+  return { currentFocus, currentApp, recentChanges, recentInsights };
+}
+
+function extractVisualSignalsFromStructured(structured) {
+  if (!structured || typeof structured !== "object") {
+    return { currentFocus: "", currentApp: "", recentChanges: [], recentInsights: [] };
+  }
+
+  const currentFocus =
+    structured.summary ||
+    structured.primaryAction ||
+    structured.screenType ||
+    structured.appOrSite ||
+    "";
+  const currentApp = structured.appOrSite || "";
+  const recentChanges = normalizeShortList([
+    ...(structured.errors || []),
+    structured.nextStep,
+    structured.primaryAction,
+  ], 6);
+  const recentInsights = normalizeShortList([
+    structured.summary,
+    structured.screenType,
+    structured.primaryAction,
+    ...(structured.importantElements || []),
+    ...(structured.visibleText || []),
+    structured.nextStep,
+  ], 8);
+
+  return { currentFocus, currentApp, recentChanges, recentInsights };
+}
+
 export const CLIENT_ACTIONS = new Set(["abrir_site", "youtube_busca", "pesquisa"]);
 export const SERVER_ACTIONS = new Set([
   "navegar",
   "pesquisar_web",
   "browser_run",
   "ver_tela",
+  "desktop_abrir_links",
+  "desktop_abrir_app",
+  "desktop_abrir_multiplos",
+  "desktop_abrir_janelas_browser",
+  "desktop_abrir_caminho",
+  "desktop_copiar_texto",
+  "desktop_enviar_teclas",
   "site_audit",
   "buscar_leads",
   "gerar_landing",
@@ -64,7 +154,18 @@ export const SERVER_ACTIONS = new Set([
 ]);
 
 export function actionRequiresApproval(tipo) {
-  return tipo === "browser_run" || tipo === "executar_shell" || tipo === "escrever_arquivo";
+  return [
+    "browser_run",
+    "executar_shell",
+    "escrever_arquivo",
+    "desktop_abrir_links",
+    "desktop_abrir_app",
+    "desktop_abrir_multiplos",
+    "desktop_abrir_janelas_browser",
+    "desktop_abrir_caminho",
+    "desktop_copiar_texto",
+    "desktop_enviar_teclas",
+  ].includes(tipo);
 }
 
 function resolveSafePath(baseDir, relativePath) {
@@ -74,6 +175,97 @@ function resolveSafePath(baseDir, relativePath) {
     throw new Error("Caminho fora do diretorio permitido");
   }
   return target;
+}
+
+function psSingleQuote(value) {
+  return String(value || "").replace(/'/g, "''");
+}
+
+function buildDesktopOpenAppCommand(app, args = []) {
+  const safeApp = String(app || "").trim().toLowerCase();
+  const allowlist = new Map([
+    ["vscode", { file: "code" }],
+    ["code", { file: "code" }],
+    ["notepad", { file: "notepad.exe" }],
+    ["bloco de notas", { file: "notepad.exe" }],
+    ["explorer", { file: "explorer.exe" }],
+    ["explorador", { file: "explorer.exe" }],
+    ["powershell", { file: "powershell.exe" }],
+    ["terminal", { file: "wt.exe" }],
+    ["cmd", { file: "cmd.exe" }],
+    ["chrome", { file: "chrome.exe" }],
+    ["edge", { file: "msedge.exe" }],
+    ["firefox", { file: "firefox.exe" }],
+    ["obsidian", { file: "obsidian.exe" }],
+    ["discord", { file: "discord.exe" }],
+    ["spotify", { file: "spotify.exe" }],
+    ["taskmgr", { file: "taskmgr.exe" }],
+    ["gerenciador de tarefas", { file: "taskmgr.exe" }],
+  ]);
+  const entry = allowlist.get(safeApp);
+  if (!entry) {
+    throw new Error(`Aplicativo nao permitido: ${app}`);
+  }
+  const argList = Array.isArray(args) ? args.filter(Boolean).map((item) => `'${psSingleQuote(item)}'`).join(", ") : "";
+  return argList
+    ? `Start-Process -FilePath '${psSingleQuote(entry.file)}' -ArgumentList ${argList}`
+    : `Start-Process -FilePath '${psSingleQuote(entry.file)}'`;
+}
+
+function buildDesktopOpenMultipleCommand(launches = []) {
+  const items = Array.isArray(launches) ? launches : [];
+  const commands = items
+    .map((item) => buildDesktopOpenAppCommand(item?.app, Array.isArray(item?.args) ? item.args : []))
+    .filter(Boolean);
+  if (!commands.length) throw new Error("Nenhum aplicativo/site para abrir");
+  return commands.join("; ");
+}
+
+function buildDesktopOpenLinksCommand(urls = []) {
+  const items = [...new Set((Array.isArray(urls) ? urls : []).map((item) => String(item || "").trim()).filter(Boolean))];
+  if (!items.length) throw new Error("Nenhum link para abrir");
+  return items
+    .map((url) => {
+      if (!isHttpUrl(url)) throw new Error(`URL invalida: ${url}`);
+      return `Start-Process '${psSingleQuote(url)}'`;
+    })
+    .join("; ");
+}
+
+function buildDesktopOpenBrowserWindowsCommand(app, count, urls = []) {
+  const browser = String(app || "").trim().toLowerCase();
+  const total = Math.max(1, Math.min(Number(count || 1) || 1, 12));
+  const normalizedUrls = [...new Set((Array.isArray(urls) ? urls : []).map((item) => String(item || "").trim()).filter(Boolean))];
+  const commands = [];
+
+  for (let index = 0; index < total; index++) {
+    const args = ["--new-window"];
+    const url = normalizedUrls[index] || normalizedUrls[0] || "about:blank";
+    if (url && url !== "about:blank" && !isHttpUrl(url)) {
+      throw new Error(`URL invalida para nova janela: ${url}`);
+    }
+    if (url) args.push(url);
+    commands.push(buildDesktopOpenAppCommand(browser, args));
+  }
+
+  return commands.join("; ");
+}
+
+function buildDesktopOpenPathCommand(rawPath) {
+  const target = String(rawPath || "").trim();
+  if (!target) throw new Error("Caminho ausente");
+  return `Start-Process -FilePath 'explorer.exe' -ArgumentList '${psSingleQuote(target)}'`;
+}
+
+function buildDesktopClipboardCommand(text) {
+  const safeText = psSingleQuote(String(text || ""));
+  return `Set-Clipboard -Value '${safeText}'`;
+}
+
+function buildDesktopKeysCommand(keys) {
+  const safeKeys = String(keys || "").trim();
+  if (!safeKeys) throw new Error("Teclas ausentes");
+  return `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${psSingleQuote(safeKeys)}')`;
 }
 
 export function buildToolsPrompt() {
@@ -101,12 +293,46 @@ FERRAMENTAS (use via "acoes"):
   efeito: KIARA pesquisa na web em tempo real. Se "profundo" for true, ela tambem le as paginas principais e traz contexto mais rico com fontes.
 
 4c) browser_run
-  dados: { "url": "https://...", "objetivo": "o que fazer", "steps": [ { "action": "click|fill|press|wait|extract", ... } ] }
-  efeito: KIARA automatiza o navegador com Playwright. Requer KIARA_ENABLE_PLAYWRIGHT=1 e allowlist de dominios.
+  dados: {
+    "url": "https://...",
+    "objetivo": "o que fazer",
+    "query": "termo opcional para pesquisa no site",
+    "steps": [ { "action": "click|fill|type|press|wait|wait_for|extract|hover|select|scroll|goto", ... } ]
+  }
+  efeito: KIARA automatiza o navegador com Playwright. Se "steps" vier vazio, ela tenta montar um plano automatico basico a partir do objetivo/query. Requer KIARA_ENABLE_PLAYWRIGHT=1.
 
 4d) ver_tela
   dados: { "pergunta": "o que procurar/entender na tela" }
   efeito: KIARA usa o ultimo frame compartilhado pelo usuario e descreve/analisa.
+  use quando a pergunta depender do que aparece na tela, do erro visivel, do lugar para clicar ou do contexto visual atual.
+
+4e) desktop_abrir_app
+  dados: { "app": "vscode|obsidian|explorer|notepad|powershell|terminal|chrome|edge|firefox|spotify|discord", "args": ["opcional"] }
+  efeito: KIARA abre um aplicativo local do Windows.
+
+4f) desktop_abrir_links
+  dados: { "urls": ["https://google.com", "https://github.com", "https://youtube.com"] }
+  efeito: KIARA abre varios sites em paralelo no navegador padrao do Windows, um processo por link.
+
+4g) desktop_abrir_multiplos
+  dados: { "launches": [ { "app": "chrome", "args": ["https://google.com"] }, { "app": "edge", "args": ["https://github.com"] } ] }
+  efeito: KIARA abre varios navegadores/aplicativos locais em paralelo, cada um com seus argumentos e URLs.
+
+4h) desktop_abrir_janelas_browser
+  dados: { "app": "chrome|edge|firefox", "count": 5, "urls": ["https://google.com", "https://github.com"] }
+  efeito: KIARA abre varias janelas separadas do navegador indicado. Se houver menos URLs do que janelas, repete a primeira URL ou abre em branco.
+
+4i) desktop_abrir_caminho
+  dados: { "path": "C:\\\\..." }
+  efeito: KIARA abre uma pasta/arquivo local no Explorer.
+
+4j) desktop_copiar_texto
+  dados: { "text": "texto para area de transferencia" }
+  efeito: KIARA copia texto para a area de transferencia local.
+
+4k) desktop_enviar_teclas
+  dados: { "keys": "^l" }
+  efeito: KIARA envia teclas para a janela ativa do Windows. Exemplo: "^l", "%{TAB}", "{ENTER}".
 
 4e) site_audit
   dados: { "url": "https://...", "maxPages": 6 }
@@ -142,9 +368,12 @@ FERRAMENTAS (use via "acoes"):
 
 REGRAS:
 - Sempre responda APENAS com JSON valido no formato:
-  { "texto": "...", "acoes": [ { "tipo": "...", "dados": { ... } } ] }
+  { "texto": "...", "fala": "...", "acoes": [ { "tipo": "...", "dados": { ... } } ] }
+- "texto" pode ser mais completo para raciocinio e continuidade.
+- "fala" deve soar natural, curta, oral e sem explicar protocolo interno desnecessariamente.
 - Se precisar de ferramenta, coloque em "acoes" com "tipo" e "dados".
 - Se nao precisar, deixe "acoes": [].
+- Para desktop local, prefira ferramentas explicitas de desktop em vez de "executar_shell".
 `.trim();
 }
 
@@ -204,6 +433,7 @@ export async function executeServerAction({ action, baseDir, knowledgeStore, con
   if (tipo === "browser_run") {
     const url = String(dados.url || "");
     const objective = String(dados.objetivo || "");
+    const query = String(dados.query || "");
     const steps = Array.isArray(dados.steps) ? dados.steps : [];
 
     const r = await runBrowserTask({
@@ -211,6 +441,7 @@ export async function executeServerAction({ action, baseDir, knowledgeStore, con
       url,
       steps,
       objective,
+      query,
       headless: process.env.KIARA_HEADLESS !== "0",
     });
 
@@ -226,11 +457,26 @@ export async function executeServerAction({ action, baseDir, knowledgeStore, con
     if (!sessionId) return { ok: false, tipo, result: "sessionId ausente" };
 
     const frame = getScreenFrame(sessionId);
+    const frameSummary = getScreenFrameSummary(sessionId);
+    const priorContext = getScreenAnalysisContext(sessionId, { limit: 2 });
+    const liveSummary = getScreenLiveSummary(sessionId);
     if (!frame?.imageBase64Jpeg) {
       return { ok: false, tipo, result: "Nenhuma tela recebida ainda" };
     }
 
     const userAsk = String(dados.pergunta || "").trim();
+    const cached = findScreenAnalysis(sessionId, {
+      prompt: userAsk,
+      signature: frame.signature,
+    });
+    if (cached?.result) {
+      const meta = [
+        `FRAME: ${new Date(frame.ts).toISOString()} (${frame.w || "?"}x${frame.h || "?"})`,
+        "CACHE: analise reutilizada do mesmo frame",
+      ].join("\n");
+      return { ok: true, tipo, result: `${meta}\n\n${cached.result}` };
+    }
+
     const prompt = [
       "Voce esta analisando a tela do usuario (captura recente).",
       "",
@@ -241,16 +487,142 @@ export async function executeServerAction({ action, baseDir, knowledgeStore, con
       "4) Sugira proximos passos praticos em bullets.",
       "5) Se houver dados sensiveis, nao copie; apenas sinalize 'conteudo sensivel detectado'.",
       "",
+      frameSummary
+        ? `Contexto temporal: tela compartilhada ha ${formatDuration(frameSummary.activeForMs)}; ultimo frame ha ${formatDuration(frameSummary.ageMs)}; total de frames recebidos: ${frameSummary.totalFrames}; houve mudanca visual recente: ${frameSummary.changedInRecentFrames ? "sim" : "nao"}.`
+        : "",
+      priorContext ? `Observacoes anteriores da mesma sessao:\n${priorContext}` : "",
+      liveSummary?.currentFocus ? `Resumo visual continuo atual:\nFoco: ${liveSummary.currentFocus}` : "",
+      "",
       userAsk ? `Pergunta do usuario: ${userAsk}` : "Pergunta do usuario: (nao especificada)",
     ].join("\n");
 
-    const vision = await analyzeImage({
+    const structuredVision = await analyzeImageStructured({
       imageBase64Jpeg: frame.imageBase64Jpeg,
       prompt,
     });
+    const vision =
+      structuredVision.ok
+        ? structuredVision
+        : await analyzeImage({
+            imageBase64Jpeg: frame.imageBase64Jpeg,
+            prompt,
+          });
 
-    const meta = `FRAME: ${new Date(frame.ts).toISOString()} (${frame.w || "?"}x${frame.h || "?"})`;
+    if (vision.ok) {
+      const structured = vision.structured || null;
+      rememberScreenObservation(sessionId, {
+        prompt: userAsk,
+        summary: String(vision.result || "").slice(0, 1500),
+        signature: frame.signature,
+      });
+      rememberScreenAnalysis(sessionId, {
+        prompt: userAsk,
+        result: String(vision.result || "").slice(0, 2000),
+        signature: frame.signature,
+      });
+      const signals = structured ? extractVisualSignalsFromStructured(structured) : extractVisualSignals(vision.result);
+      const mergedInsights = [...new Set([...(liveSummary?.recentInsights || []), ...(signals.recentInsights || [])])].slice(-8);
+      const mergedChanges = [...new Set([...(liveSummary?.recentChanges || []), ...(signals.recentChanges || [])])].slice(-6);
+      updateScreenLiveSummary(sessionId, {
+        currentFocus: signals.currentFocus || liveSummary?.currentFocus || "",
+        currentApp: signals.currentApp || liveSummary?.currentApp || "",
+        recentInsights: mergedInsights,
+        recentChanges: mergedChanges,
+      });
+      if (knowledgeStore && context?.workspaceId) {
+        await knowledgeStore.addNote(context.workspaceId, {
+          titulo: "Padrao visual observado",
+          conteudo: [
+            userAsk ? `Pergunta: ${userAsk}` : "Pergunta: (nao especificada)",
+            "",
+            `Resumo visual:`,
+            summarizeVisualPattern(vision.result),
+            structured?.appOrSite ? `\nApp/Site detectado: ${structured.appOrSite}` : "",
+            structured?.screenType ? `Tela detectada: ${structured.screenType}` : "",
+            structured?.nextStep ? `Proximo passo sugerido: ${structured.nextStep}` : "",
+          ].join("\n"),
+          tags: ["screen", "visual", "padrao-ui"],
+          tipoConhecimento: "padrao",
+        });
+      }
+    }
+
+    const meta = [
+      `FRAME: ${new Date(frame.ts).toISOString()} (${frame.w || "?"}x${frame.h || "?"})`,
+      frameSummary ? `SESSAO_VISUAL: ativa ha ${formatDuration(frameSummary.activeForMs)}; frames=${frameSummary.totalFrames}; mudanca_recente=${frameSummary.changedInRecentFrames ? "sim" : "nao"}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
     return { ok: vision.ok, tipo, result: `${meta}\n\n${vision.result}` };
+  }
+
+  if (tipo === "desktop_abrir_app") {
+    const app = String(dados.app || "").trim();
+    const args = Array.isArray(dados.args) ? dados.args.map((item) => String(item)) : [];
+    const command = buildDesktopOpenAppCommand(app, args);
+    await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], { cwd: baseDir, timeout: 20_000 });
+    return { ok: true, tipo, result: `Aplicativo aberto: ${app}` };
+  }
+
+  if (tipo === "desktop_abrir_links") {
+    const urls = Array.isArray(dados.urls) ? dados.urls.map((item) => String(item)) : [];
+    const command = buildDesktopOpenLinksCommand(urls);
+    await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], { cwd: baseDir, timeout: 25_000 });
+    return {
+      ok: true,
+      tipo,
+      result: `Links abertos: ${urls.join(" | ")}`,
+    };
+  }
+
+  if (tipo === "desktop_abrir_multiplos") {
+    const launches = Array.isArray(dados.launches)
+      ? dados.launches.map((item) => ({
+          app: String(item?.app || "").trim(),
+          args: Array.isArray(item?.args) ? item.args.map((arg) => String(arg)) : [],
+        }))
+      : [];
+    const command = buildDesktopOpenMultipleCommand(launches);
+    await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], { cwd: baseDir, timeout: 25_000 });
+    return {
+      ok: true,
+      tipo,
+      result: `Aberturas disparadas: ${launches.map((item) => `${item.app}${item.args?.length ? `(${item.args.join(", ")})` : ""}`).join(" | ")}`,
+    };
+  }
+
+  if (tipo === "desktop_abrir_janelas_browser") {
+    const app = String(dados.app || "").trim();
+    const count = Number(dados.count || 1) || 1;
+    const urls = Array.isArray(dados.urls) ? dados.urls.map((item) => String(item)) : [];
+    const command = buildDesktopOpenBrowserWindowsCommand(app, count, urls);
+    await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], { cwd: baseDir, timeout: 25_000 });
+    return {
+      ok: true,
+      tipo,
+      result: `Janelas abertas: navegador=${app}; quantidade=${count}; urls=${urls.join(" | ") || "about:blank"}`,
+    };
+  }
+
+  if (tipo === "desktop_abrir_caminho") {
+    const rawPath = String(dados.path || "").trim();
+    const command = buildDesktopOpenPathCommand(rawPath);
+    await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], { cwd: baseDir, timeout: 20_000 });
+    return { ok: true, tipo, result: `Caminho aberto: ${rawPath}` };
+  }
+
+  if (tipo === "desktop_copiar_texto") {
+    const text = String(dados.text || "");
+    const command = buildDesktopClipboardCommand(text);
+    await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], { cwd: baseDir, timeout: 15_000 });
+    return { ok: true, tipo, result: `Texto copiado para a area de transferencia (${text.length} caracteres)` };
+  }
+
+  if (tipo === "desktop_enviar_teclas") {
+    const keys = String(dados.keys || "").trim();
+    const command = buildDesktopKeysCommand(keys);
+    await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], { cwd: baseDir, timeout: 15_000 });
+    return { ok: true, tipo, result: `Teclas enviadas para a janela ativa: ${keys}` };
   }
 
   if (tipo === "site_audit") {
@@ -380,7 +752,16 @@ export async function executeServerAction({ action, baseDir, knowledgeStore, con
       .replace(/\s+/g, "-")
       .slice(0, 60);
 
-    const spec = { nome: nome || safeName, objetivo, url, passos, createdAt: new Date().toISOString() };
+    const tags = inferAutomationTags(`${nome}\n${objetivo}\n${url}\n${passos.join("\n")}`);
+    const spec = {
+      nome: nome || safeName,
+      objetivo,
+      url,
+      passos,
+      tags,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
     const relativePath = path.join("data", "workspaces", workspaceId, "automations", `${safeName || "automacao"}.json`);
 
     if (process.env.KIARA_ENABLE_WRITE === "1") {

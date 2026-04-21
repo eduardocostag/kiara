@@ -1,0 +1,16 @@
+{
+  "nome": "diagnostico-grafana-dashboard",
+  "objetivo": "Diagnosticar dashboards, consultas e alertas no Grafana com foco em datasource, query e visualizacao.",
+  "url": "",
+  "tags": ["infraestrutura", "grafana", "observabilidade", "prometheus", "loki"],
+  "passos": [
+    "Confirmar datasource, credencial, organizacao e permissao envolvida.",
+    "Validar time range, timezone, intervalo e refresh antes de culpar a query.",
+    "Testar a query isolada e comparar painel versus origem do dado.",
+    "Checar variaveis, labels, filtros, transformacoes e thresholds aplicados no dashboard.",
+    "Separar falha em ausencia de dado, erro de consulta, problema de agregacao ou problema visual do painel.",
+    "Se houver alerting, revisar regra, janela de avaliacao, condicao e datasource real usado pela regra."
+  ],
+  "createdAt": "2026-04-21T00:00:00.000Z",
+  "updatedAt": "2026-04-21T00:00:00.000Z"
+}

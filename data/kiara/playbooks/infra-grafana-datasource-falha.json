@@ -1,0 +1,16 @@
+{
+  "nome": "grafana-datasource-falha",
+  "objetivo": "Diagnosticar datasource com erro no Grafana distinguindo credencial, conectividade, permissao e ausencia de dado.",
+  "url": "",
+  "tags": ["infraestrutura", "grafana", "datasource", "prometheus", "loki", "troubleshooting"],
+  "passos": [
+    "Confirmar datasource afetado, tipo, ambiente, erro exibido e impacto em dashboards ou alertas.",
+    "Validar URL, autenticacao, token, organizacao, certificado e conectividade de rede.",
+    "Checar se o datasource falha no teste de conexao ou apenas em consultas especificas.",
+    "Separar erro de credencial, erro HTTP, erro TLS, erro de query ou indisponibilidade da origem.",
+    "Comparar query simples de teste com a query real do painel.",
+    "Encerrar com verificacao objetiva de reconexao e retorno de dado."
+  ],
+  "createdAt": "2026-04-21T00:00:00.000Z",
+  "updatedAt": "2026-04-21T00:00:00.000Z"
+}

@@ -1,0 +1,27 @@
+{
+  "nome": "Funil de Captacao e Follow-up",
+  "objetivo": "Organizar captacao, triagem e follow-up comercial para transformar demanda em conversa qualificada e oportunidade real.",
+  "url": "",
+  "tags": ["marketing", "vendas", "lead", "followup", "pipeline"],
+  "passos": [
+    "Definir oferta principal, publico e CTA unico.",
+    "Mapear origem dos leads e separar volume de qualidade.",
+    "Criar roteiro de qualificacao com ICP, dor, urgencia e ticket.",
+    "Padronizar follow-up por etapa com proximo passo claro.",
+    "Medir CPL, taxa de resposta, qualificacao e conversao por etapa."
+  ],
+  "checkpoints": [
+    "Oferta clara e especifica",
+    "Canal principal definido",
+    "Script de qualificacao pronto",
+    "Follow-up com prazo e contexto",
+    "Metricas minimas acompanhadas"
+  ],
+  "successCriteria": [
+    "Mais leads qualificados",
+    "Menos perda por falta de follow-up",
+    "Conversao por etapa mais visivel"
+  ],
+  "createdAt": "2026-04-20T00:00:00.000Z",
+  "updatedAt": "2026-04-20T00:00:00.000Z"
+}

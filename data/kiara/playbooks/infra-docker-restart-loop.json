@@ -1,0 +1,16 @@
+{
+  "nome": "docker-restart-loop",
+  "objetivo": "Investigar container em restart loop diferenciando falha de aplicacao, volume, rede, healthcheck, env e comando de inicializacao.",
+  "url": "",
+  "tags": ["infraestrutura", "docker", "containers", "restart-loop", "linux"],
+  "passos": [
+    "Identificar container, imagem, compose stack, restart policy e intervalo do loop.",
+    "Checar logs recentes, exit code, healthcheck, comando de entrada e variaveis obrigatorias.",
+    "Validar mounts, volumes, permissoes, portas, dependencia externa e rede do compose.",
+    "Separar erro do app dentro do container de erro do host ou do orchestration layer.",
+    "Se houver dependencia de banco ou API, verificar readiness e ordem de subida.",
+    "Fechar com teste claro de estabilidade: container up, health ok e logs sem erro recorrente."
+  ],
+  "createdAt": "2026-04-21T00:00:00.000Z",
+  "updatedAt": "2026-04-21T00:00:00.000Z"
+}

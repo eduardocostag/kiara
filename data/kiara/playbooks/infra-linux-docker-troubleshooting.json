@@ -1,0 +1,16 @@
+{
+  "nome": "troubleshooting-linux-docker",
+  "objetivo": "Fazer troubleshooting senior em Linux e Docker com ordem, evidencia e comandos de verificacao.",
+  "url": "",
+  "tags": ["infraestrutura", "linux", "docker", "containers", "troubleshooting"],
+  "passos": [
+    "Definir escopo: host, servico, container, rede, volume ou pipeline.",
+    "Levantar evidencia com status, logs, recursos, portas, mounts e processos.",
+    "Separar sintomas de causa: erro de app, rede, permissao, volume, imagem, compose ou systemd.",
+    "Checar comandos basicos de estado antes de qualquer alteracao destrutiva.",
+    "Propor correcao minima reversivel, validar resultado e so depois consolidar ajuste permanente.",
+    "Fechar com criterio de validacao: servico ativo, container saudavel, logs estaveis e metrica normalizada."
+  ],
+  "createdAt": "2026-04-21T00:00:00.000Z",
+  "updatedAt": "2026-04-21T00:00:00.000Z"
+}

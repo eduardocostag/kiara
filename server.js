@@ -12,6 +12,7 @@ import { putScreenFrame, clearScreen } from "./screenStore.js";
 import { generateTtsBase64 } from "./tts.js";
 import { buildLlmConfig } from "./llm.js";
 import { createLogger } from "./logger.js";
+import { createActionLearningStore } from "./actionLearningStore.js";
 
 function withTimeout(task, ms, label) {
   return Promise.race([
@@ -43,6 +44,7 @@ const redis =
 
 const memoryStore = createMemoryStore({ redis, baseDir: __dirname });
 const knowledgeStore = createKnowledgeStore({ redis, baseDir: __dirname });
+const actionLearningStore = createActionLearningStore({ baseDir: __dirname });
 
 app.post("/api/chat", async (req, res) => {
   const { pergunta, perfil, autonoma, alocacaoUrl, workspaceId, sessionId, tts } = req.body || {};
@@ -75,12 +77,12 @@ app.post("/api/chat", async (req, res) => {
         baseDir: __dirname,
         llmConfig,
       }),
-      12000,
+      20000,
       "startRun",
     );
 
     const ttsMode = String(tts || "server").toLowerCase();
-    const audio = ttsMode === "server" ? await generateTtsBase64(resposta.texto) : null;
+    const audio = ttsMode === "server" ? await generateTtsBase64(resposta.fala || resposta.texto) : null;
 
     await logger.info("api.chat.finish", {
       sessionId: sessionId || null,
@@ -94,6 +96,7 @@ app.post("/api/chat", async (req, res) => {
 
     return res.json({
       texto: resposta.texto,
+      fala: resposta.fala || resposta.texto,
       acoes: resposta.acoes || [],
       runId: resposta.runId || null,
       pendencias: resposta.pendencias || [],
@@ -135,12 +138,12 @@ app.post("/api/continue", async (req, res) => {
         memoryStore,
         knowledgeStore,
       }),
-      12000,
+      20000,
       "continueRun",
     );
 
     const ttsMode = String(tts || "server").toLowerCase();
-    const audio = ttsMode === "server" ? await generateTtsBase64(resposta.texto) : null;
+    const audio = ttsMode === "server" ? await generateTtsBase64(resposta.fala || resposta.texto) : null;
 
     await logger.info("api.continue.finish", {
       runId: resposta.runId || null,
@@ -153,6 +156,7 @@ app.post("/api/continue", async (req, res) => {
 
     return res.json({
       texto: resposta.texto,
+      fala: resposta.fala || resposta.texto,
       acoes: resposta.acoes || [],
       runId: resposta.runId || null,
       pendencias: resposta.pendencias || [],
@@ -199,6 +203,16 @@ app.post("/api/screen/stop", async (req, res) => {
   const { sessionId } = req.body || {};
   if (sessionId) clearScreen(sessionId);
   return res.json({ ok: true });
+});
+
+app.get("/api/workspace/:workspaceId/learned-actions", async (req, res) => {
+  const workspaceId = String(req.params.workspaceId || "default");
+  try {
+    const summary = await actionLearningStore.summarizeWorkspace(workspaceId, {});
+    return res.json({ ok: true, workspaceId, summary });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err?.message || String(err) });
+  }
 });
 
 if (process.env.NODE_ENV !== "production") {

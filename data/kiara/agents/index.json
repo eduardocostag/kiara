@@ -72,11 +72,67 @@
       "priority": 8
     },
     {
+      "slug": "engineering-frontend-developer",
+      "area": "engenharia",
+      "title": "Engineering Frontend Developer",
+      "tags": ["engenharia", "frontend", "ui", "ux", "react", "performance", "acessibilidade"],
+      "priority": 9
+    },
+    {
+      "slug": "engineering-devops-automator",
+      "area": "engenharia",
+      "title": "Engineering DevOps Automator",
+      "tags": ["engenharia", "devops", "ci", "cd", "deploy", "observabilidade", "infra"],
+      "priority": 10
+    },
+    {
+      "slug": "engineering-security-engineer",
+      "area": "engenharia",
+      "title": "Engineering Security Engineer",
+      "tags": ["engenharia", "seguranca", "security", "vulnerabilidade", "hardening", "acesso"],
+      "priority": 9
+    },
+    {
+      "slug": "engineering-code-reviewer",
+      "area": "engenharia",
+      "title": "Engineering Code Reviewer",
+      "tags": ["engenharia", "review", "codigo", "qualidade", "manutenibilidade", "risco"],
+      "priority": 9
+    },
+    {
       "slug": "technology-automation-architect",
       "area": "tecnologia",
       "title": "Technology Automation Architect",
       "tags": ["tecnologia", "automacao", "agente", "workflow", "playbook"],
       "priority": 10
+    },
+    {
+      "slug": "product-product-strategist",
+      "area": "produto",
+      "title": "Product Product Strategist",
+      "tags": ["produto", "discovery", "priorizacao", "roadmap", "usuario", "mvp"],
+      "priority": 10
+    },
+    {
+      "slug": "strategy-business-strategist",
+      "area": "estrategia",
+      "title": "Strategy Business Strategist",
+      "tags": ["estrategia", "negocio", "posicionamento", "mercado", "modelo", "decisao"],
+      "priority": 9
+    },
+    {
+      "slug": "support-customer-support-specialist",
+      "area": "suporte",
+      "title": "Support Customer Support Specialist",
+      "tags": ["suporte", "atendimento", "triagem", "cliente", "sla", "resolucao"],
+      "priority": 8
+    },
+    {
+      "slug": "testing-qa-test-engineer",
+      "area": "testes",
+      "title": "Testing QA Test Engineer",
+      "tags": ["testes", "qa", "qualidade", "regressao", "cenarios", "validacao"],
+      "priority": 9
     },
     {
       "slug": "infra-linux-systems-engineer",

@@ -197,10 +197,43 @@ export function createKnowledgeStore({ redis, baseDir }) {
       .join("\n\n");
   }
 
+  async function getTopNotesByTags(workspaceId, tags = [], { limit = 6 } = {}) {
+    const wanted = Array.isArray(tags)
+      ? tags.map((item) => String(item || "").toLowerCase().trim()).filter(Boolean)
+      : [];
+    if (!wanted.length) return "";
+
+    const [workspaceItems, globalDocs] = await Promise.all([
+      loadWorkspaceItems(workspaceId),
+      readTextFilesDeep(globalKnowledgeRoot),
+    ]);
+
+    const combined = [...workspaceItems, ...globalDocs];
+    const ranked = combined
+      .map((item) => {
+        const haystack = `${item.titulo || ""} ${item.conteudo || ""} ${(item.tags || []).join(" ")} ${item.path || ""}`.toLowerCase();
+        const score = wanted.reduce((acc, tag) => acc + (haystack.includes(tag) ? 1 : 0), 0);
+        return { ...item, score };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return Number(b.time || 0) - Number(a.time || 0);
+      })
+      .slice(0, limit);
+
+    return ranked
+      .map((item) => {
+        const source = item.path ? `Fonte: ${path.relative(baseDir, item.path).replace(/\\/g, "/")}` : "";
+        return [`NOTA: ${item.titulo || "(sem titulo)"}`, source, String(item.conteudo || "").trim()].filter(Boolean).join("\n");
+      })
+      .join("\n\n");
+  }
+
   function localFile(workspaceId) {
     const local = getLocal(workspaceId);
     return local.filePath;
   }
 
-  return { addNote, search, localFile };
+  return { addNote, search, getTopNotesByTags, localFile };
 }

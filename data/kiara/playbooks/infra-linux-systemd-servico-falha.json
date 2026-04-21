@@ -1,0 +1,16 @@
+{
+  "nome": "linux-systemd-servico-falha",
+  "objetivo": "Diagnosticar servico systemd falhando com foco em unit, dependencia, permissao, ambiente e logs.",
+  "url": "",
+  "tags": ["infraestrutura", "linux", "systemd", "servico", "troubleshooting"],
+  "passos": [
+    "Identificar servico, host, impacto e estado exato: failed, activating, restarting ou dead.",
+    "Ler status completo da unit e logs recentes antes de reiniciar em loop.",
+    "Validar caminho de binario, user, group, WorkingDirectory, Environment e permissao de arquivos.",
+    "Checar dependencia de porta, arquivo, mount, rede ou outro servico systemd.",
+    "Separar falha de configuracao da unit de falha da aplicacao chamada pela unit.",
+    "Concluir com criterio objetivo: systemctl active, logs limpos e porta/processo validado."
+  ],
+  "createdAt": "2026-04-21T00:00:00.000Z",
+  "updatedAt": "2026-04-21T00:00:00.000Z"
+}

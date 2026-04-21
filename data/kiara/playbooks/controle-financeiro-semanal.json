@@ -1,0 +1,27 @@
+{
+  "nome": "Controle Financeiro Semanal",
+  "objetivo": "Dar visibilidade rapida sobre caixa, compromissos, margem e risco de curto prazo.",
+  "url": "",
+  "tags": ["financas", "caixa", "margem", "inadimplencia", "gestao"],
+  "passos": [
+    "Levantar saldo atual e entradas previstas da semana.",
+    "Listar saidas, vencimentos e compromissos proximos.",
+    "Separar custo fixo, variavel, investimento e retirada.",
+    "Evidenciar risco de caixa, inadimplencia e compressao de margem.",
+    "Definir decisoes da semana: cortar, renegociar, cobrar, acelerar recebimento ou repricing."
+  ],
+  "checkpoints": [
+    "Saldo de caixa atualizado",
+    "Agenda financeira da semana visivel",
+    "Despesas classificadas",
+    "Risco de curto prazo destacado",
+    "Plano de acao financeiro definido"
+  ],
+  "successCriteria": [
+    "Mais previsibilidade de caixa",
+    "Decisao financeira mais rapida",
+    "Menos confusao entre faturamento e lucro"
+  ],
+  "createdAt": "2026-04-20T00:00:00.000Z",
+  "updatedAt": "2026-04-20T00:00:00.000Z"
+}

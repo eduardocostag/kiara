@@ -2,10 +2,50 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import fs from "fs/promises";
 import path from "path";
 
+function humanizeUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./i, "");
+
+    if (/google\./i.test(host)) return "Google";
+    if (/youtube\./i.test(host)) return "YouTube";
+    if (/instagram\./i.test(host)) return "Instagram";
+    if (/facebook\./i.test(host)) return "Facebook";
+    if (/linkedin\./i.test(host)) return "LinkedIn";
+    if (/github\./i.test(host)) return "GitHub";
+    if (/drive\.google\./i.test(host)) return "Google Drive";
+    if (/mail\.google\./i.test(host)) return "Gmail";
+    if (/whatsapp\./i.test(host)) return "WhatsApp";
+
+    return host;
+  } catch {
+    return "o site";
+  }
+}
+
 function limparTexto(texto) {
   return String(texto || "")
-    .replace(/[*_`]/g, "")
-    .replace(/[\u{1F600}-\u{1F6FF}]/gu, "")
+    .replace(/https?:\/\/[^\s]+/gi, (url) => humanizeUrl(url))
+    .replace(/\bwww\.[^\s]+/gi, "site")
+    .replace(/[*_`#>|[\]{}]/g, " ")
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, " ")
+    .replace(/\b[A-Z]{2,}\b/g, (sigla) => {
+      const known = {
+        SEO: "S E O",
+        API: "A P I",
+        CRM: "C R M",
+        CAC: "C A C",
+        ROI: "R O I",
+        ROAS: "R O A S",
+        UX: "U X",
+        UI: "U I",
+        QA: "Q A",
+        TTS: "T T S",
+      };
+      return known[sigla] || sigla;
+    })
+    .replace(/\babrindo\s+(google|youtube|instagram|facebook|linkedin|github|google drive|gmail|whatsapp)\b/gi, "Abrindo o $1")
+    .replace(/\babrindo o site\b/gi, "Abrindo o site")
     .replace(/\s+/g, " ")
     .trim();
 }

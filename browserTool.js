@@ -35,6 +35,60 @@ function truncate(text, max = 9000) {
   return `${s.slice(0, max)}\n...[TRUNCADO]`;
 }
 
+function extractSearchQuery({ objective, query }) {
+  const explicit = String(query || "").trim();
+  if (explicit) return explicit;
+
+  const text = String(objective || "").trim();
+  if (!text) return "";
+
+  const patterns = [
+    /\b(?:pesquise|procure|busque|search for|search)\b\s+["“]?(.+?)["”]?(?:\s+\b(?:no|na|em)\b.+)?$/i,
+    /\b(?:pesquisar|search)\b\s+por\s+["“]?(.+?)["”]?$/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) return match[1].trim();
+  }
+
+  return "";
+}
+
+function buildAutoPlan({ objective, query }) {
+  const searchQuery = extractSearchQuery({ objective, query });
+  const lower = String(objective || "").toLowerCase();
+  const steps = [];
+
+  if (searchQuery) {
+    steps.push({
+      action: "fill",
+      selector:
+        'input[type="search"], input[name="q"], input[placeholder*="Buscar" i], input[placeholder*="Search" i], input[aria-label*="Buscar" i], input[aria-label*="Search" i], form input[type="text"]',
+      fallbackSelector: "input",
+      text: searchQuery,
+      timeout: 10000,
+    });
+    steps.push({
+      action: "press",
+      selector:
+        'input[type="search"], input[name="q"], input[placeholder*="Buscar" i], input[placeholder*="Search" i], input[aria-label*="Buscar" i], input[aria-label*="Search" i], form input[type="text"]',
+      fallbackSelector: "input",
+      key: "Enter",
+      timeout: 10000,
+    });
+    steps.push({ action: "wait", ms: 1200 });
+  }
+
+  if (/\b(?:scroll|role|descer|abaixo)\b/.test(lower)) {
+    steps.push({ action: "scroll", y: 900 });
+    steps.push({ action: "wait", ms: 600 });
+  }
+
+  steps.push({ action: "extract", selector: "body", timeout: 15000 });
+  return steps;
+}
+
 async function getPlaywright() {
   try {
     return await import("playwright");
@@ -69,6 +123,7 @@ async function runStep(page, step, push) {
   const selector = String(step?.selector || "");
   const fallbackSelector = String(step?.fallbackSelector || "");
   const timeout = Math.min(Number(step?.timeout || 12000) || 12000, 30000);
+  const target = selector || fallbackSelector;
 
   if (action === "wait") {
     const ms = Math.min(Number(step?.ms || 0) || 0, 30000);
@@ -85,12 +140,17 @@ async function runStep(page, step, push) {
   }
 
   if (action === "click") {
-    push(`CLICK ${selector || fallbackSelector}`);
+    const text = String(step?.text || "").trim();
+    push(`CLICK ${target || text || "(auto)"}`);
     await withRetries(
       async () => {
-        await waitForMaybe(page, selector || fallbackSelector, timeout);
-        const target = selector || fallbackSelector;
-        await page.click(target, { timeout });
+        if (target) {
+          await waitForMaybe(page, target, timeout);
+          await page.click(target, { timeout });
+          return;
+        }
+        if (!text) throw new Error("CLICK sem selector/text");
+        await page.getByText(text, { exact: false }).first().click({ timeout });
       },
       {
         retries: 2,
@@ -113,11 +173,11 @@ async function runStep(page, step, push) {
 
   if (action === "fill") {
     const text = String(step?.text ?? "");
-    push(`FILL ${selector || fallbackSelector}`);
+    push(`FILL ${target || "(auto)"} :: ${text.slice(0, 80)}`);
     await withRetries(
       async () => {
-        await waitForMaybe(page, selector || fallbackSelector, timeout);
-        const target = selector || fallbackSelector;
+        if (!target) throw new Error("FILL sem selector");
+        await waitForMaybe(page, target, timeout);
         await page.fill(target, text, { timeout });
       },
       {
@@ -133,12 +193,15 @@ async function runStep(page, step, push) {
 
   if (action === "press") {
     const key = String(step?.key || "Enter");
-    push(`PRESS ${selector || fallbackSelector} ${key}`);
+    push(`PRESS ${target || "body"} ${key}`);
     await withRetries(
       async () => {
-        await waitForMaybe(page, selector || fallbackSelector, timeout);
-        const target = selector || fallbackSelector;
-        await page.press(target, key, { timeout });
+        if (target) {
+          await waitForMaybe(page, target, timeout);
+          await page.press(target, key, { timeout });
+          return;
+        }
+        await page.keyboard.press(key);
       },
       {
         retries: 1,
@@ -152,12 +215,12 @@ async function runStep(page, step, push) {
   }
 
   if (action === "extract") {
-    const target = selector || "body";
-    push(`EXTRACT ${target}`);
+    const extractTarget = target || "body";
+    push(`EXTRACT ${extractTarget}`);
     const text = await withRetries(
       async () => {
-        await waitForMaybe(page, target, timeout);
-        return page.locator(target).innerText({ timeout });
+        await waitForMaybe(page, extractTarget, timeout);
+        return page.locator(extractTarget).innerText({ timeout });
       },
       {
         retries: 1,
@@ -172,16 +235,54 @@ async function runStep(page, step, push) {
   }
 
   if (action === "wait_for") {
-    const target = selector || fallbackSelector;
     push(`WAIT_FOR ${target}`);
     await waitForMaybe(page, target, timeout);
+    return;
+  }
+
+  if (action === "type") {
+    const text = String(step?.text ?? "");
+    if (!target) throw new Error("TYPE sem selector");
+    push(`TYPE ${target}`);
+    await waitForMaybe(page, target, timeout);
+    await page.locator(target).pressSequentially(text, { timeout });
+    return;
+  }
+
+  if (action === "hover") {
+    if (!target) throw new Error("HOVER sem selector");
+    push(`HOVER ${target}`);
+    await waitForMaybe(page, target, timeout);
+    await page.hover(target, { timeout });
+    return;
+  }
+
+  if (action === "select") {
+    const value = String(step?.value ?? "");
+    if (!target) throw new Error("SELECT sem selector");
+    push(`SELECT ${target} => ${value}`);
+    await waitForMaybe(page, target, timeout);
+    await page.selectOption(target, value, { timeout });
+    return;
+  }
+
+  if (action === "scroll") {
+    const x = Number(step?.x || 0) || 0;
+    const y = Number(step?.y || 0) || 0;
+    push(`SCROLL ${x},${y}`);
+    await page.mouse.wheel(x, y || 800);
+    return;
+  }
+
+  if (action === "screenshot") {
+    push("SCREENSHOT_STEP");
     return;
   }
 
   throw new Error(`Acao de browser nao suportada: ${action}`);
 }
 
-export async function runBrowserTask({ baseDir, url, steps = [], objective, headless = true }) {
+export async function runBrowserTask({ baseDir, url, steps = [], objective, query, headless = true }) {
   if (process.env.KIARA_ENABLE_PLAYWRIGHT !== "1") {
     return { ok: false, result: "Playwright desativado (set KIARA_ENABLE_PLAYWRIGHT=1)" };
   }
@@ -212,8 +313,10 @@ export async function runBrowserTask({ baseDir, url, steps = [], objective, head
     push(`OBJETIVO: ${objective || "(nao informado)"}`);
     push(`GOTO: ${targetUrl}`);
     await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
+    const normalizedSteps = Array.isArray(steps) && steps.length ? steps : buildAutoPlan({ objective, query });
+    push(`PLANO: ${normalizedSteps.length ? "manual/auto" : "sem passos"}`);
 
-    for (const [index, step] of (Array.isArray(steps) ? steps : []).entries()) {
+    for (const [index, step] of normalizedSteps.entries()) {
       try {
         push(`STEP ${index + 1}: ${step?.action || "(desconhecida)"}`);
         await runStep(page, step, push);
@@ -244,11 +347,13 @@ export async function runBrowserTask({ baseDir, url, steps = [], objective, head
 
     await page.screenshot({ path: screenshotPath, fullPage: true });
     const bodyText = await page.locator("body").innerText({ timeout: 20000 });
+    const title = await page.title().catch(() => "");
 
     return {
       ok: true,
       result: [
         `URL_FINAL: ${page.url()}`,
+        `TITLE: ${title || "(sem titulo)"}`,
         `SCREENSHOT: data/runs/${path.basename(screenshotPath)}`,
         "",
         "LOGS:",

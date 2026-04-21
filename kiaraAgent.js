@@ -32,7 +32,7 @@ function profilePrompt(perfil) {
   return map[p] ? `PERFIL: ${map[p]}` : `PERFIL: ${perfil}`;
 }
 
-function buildSystemPrompt({ memoria, conversaRecente, conhecimento, perfil, brainContent, providerName }) {
+function buildSystemPrompt({ memoria, memoriaPersistente, conversaRecente, conhecimento, perfil, brainContent, providerName }) {
   return `
 Voce e KIARA.
 Uma IA autonoma, analitica e conversacional.
@@ -58,6 +58,7 @@ METODO:
 POLITICA DE SEGURANCA:
 - So use "salvar_nota" se o usuario pedir para lembrar, ou se for um aprendizado generico.
 - Evite sugerir "executar_shell" e "escrever_arquivo" a menos que o usuario peca explicitamente.
+- Para acoes de desktop local, prefira ferramentas explicitas de desktop e trate isso como acao que pede aprovacao.
 - Para automacao em sites, prefira "pesquisar_web" + "navegar". Use "browser_run" quando precisar interagir.
 
 CONHECIMENTO SALVO:
@@ -69,10 +70,20 @@ ${conversaRecente || "(vazia)"}
 MEMORIA RECENTE:
 ${memoria || "(vazia)"}
 
+MEMORIA PERSISTENTE:
+${memoriaPersistente || "(vazia)"}
+
 NUCLEO DE IDENTIDADE (kiara_brain.md):
 ${brainContent || "(vazio)"}
 
 ${buildToolsPrompt()}
+
+FORMATO DE RESPOSTA:
+- Sempre devolva "texto" e "fala".
+- "texto": pode ser mais completo e analitico.
+- "fala": obrigatoria, curta, natural, oral e pronta para voz.
+- Em "fala", evite URLs, protocolos internos, listas longas e linguagem de relatorio.
+- Em "fala", use tom presente e humano.
 `.trim();
 }
 
@@ -105,6 +116,7 @@ export async function runKiaraAgent({
 }) {
   const safeBaseDir = baseDir || path.resolve(".");
   const memoria = memoryStore ? await memoryStore.getRelevant(workspaceId, pergunta) : "";
+  const memoriaPersistente = memoryStore?.getProfile ? await memoryStore.getProfile(workspaceId, { limit: 10 }) : "";
   const conversaRecente = memoryStore?.getRecent ? await memoryStore.getRecent(workspaceId, { limit: 8 }) : "";
   const conhecimento = knowledgeStore ? await knowledgeStore.search(workspaceId, pergunta) : "";
   const agencyRef = await loadAgencyReference({ baseDir: safeBaseDir, perfil, pergunta });
@@ -124,6 +136,7 @@ export async function runKiaraAgent({
   for (let step = 0; step < maxSteps; step++) {
     const system = buildSystemPrompt({
       memoria,
+      memoriaPersistente,
       conversaRecente,
       conhecimento,
       perfil,
@@ -166,6 +179,7 @@ export async function runKiaraAgent({
         pergunta,
         conhecimento,
         memoria,
+        memoriaPersistente,
         conversaRecente,
         agencyRef,
         toolContext,

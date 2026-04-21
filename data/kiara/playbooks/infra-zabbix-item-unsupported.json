@@ -1,0 +1,16 @@
+{
+  "nome": "zabbix-item-unsupported",
+  "objetivo": "Diagnosticar item unsupported no Zabbix sem chutar causa e com foco em evidencias do host, agente, key e coleta.",
+  "url": "",
+  "tags": ["infraestrutura", "zabbix", "linux", "troubleshooting", "item-unsupported"],
+  "passos": [
+    "Identificar host, item key, tipo de item, intervalo de coleta e mensagem exata de erro.",
+    "Validar se a key existe, se o agente ou comando customizado responde e se o timeout esta adequado.",
+    "Checar permissao, binario ausente, path incorreto, dependencia externa e retorno invalido do comando.",
+    "Se houver proxy, validar caminho host -> proxy -> server e possivel atraso de fila.",
+    "Separar problema de configuracao do item de problema de ambiente no host monitorado.",
+    "Encerrar com comando ou teste objetivo para confirmar quando o item voltou a coletar."
+  ],
+  "createdAt": "2026-04-21T00:00:00.000Z",
+  "updatedAt": "2026-04-21T00:00:00.000Z"
+}

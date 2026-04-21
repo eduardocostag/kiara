@@ -35,7 +35,7 @@ async function callMistral({ apiKey, model, messages, temperature = 0.5 }) {
     throw new Error("MISTRAL_KEY nao configurada");
   }
 
-  const request = timeoutSignal(7000);
+  const request = timeoutSignal(15000);
   let res;
   try {
     res = await fetch("https://api.mistral.ai/v1/chat/completions", {
@@ -82,7 +82,7 @@ async function callOllama({ baseUrl, model, messages, temperature = 0.4 }) {
   const resolvedBaseUrl = String(baseUrl || process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434").replace(/\/+$/, "");
   const resolvedModel = model || process.env.OLLAMA_MODEL || "qwen2.5:7b-instruct";
 
-  const request = timeoutSignal(7000);
+  const request = timeoutSignal(15000);
   let res;
   try {
     res = await fetch(`${resolvedBaseUrl}/api/chat`, {
